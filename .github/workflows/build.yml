@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     # Forks do not have the signing secrets and must never publish a release that
     # looks official. Only the original repository builds and releases.
-    if: github.repository == 'ashutoshnishad799-svg/AshuDialer-v2'
+    if: github.repository == 'ashutoshnishad799-svg/AshuDialer-v3-public'
 
     steps:
       - name: Checkout
