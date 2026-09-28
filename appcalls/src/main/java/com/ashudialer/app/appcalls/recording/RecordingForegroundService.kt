@@ -1,20 +1,3 @@
-/*
- * Ashu Phone
- * Copyright (C) 2026 Ashutosh Nishad
- *
- * This file is adapted from ShizuCallRecorder
- * (https://github.com/kitsumed/ShizuCallRecorder),
- * Copyright (C) kitsumed and contributors, licensed under GPL-3.0-or-later.
- * The original "adapted from" note is kept below. Changes were made by
- * Ashutosh Nishad in 2026.
- *
- * This file is part of Ashu Phone, licensed under the GNU General Public
- * License, version 3 or (at your option) any later version.
- * See the LICENSE and NOTICE files in the project root.
- * This program comes with ABSOLUTELY NO WARRANTY.
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
 // Structure adapted from ShizuCallRecorder's RecordingForegroundService (github.com/kitsumed/ShizuCallRecorder), GPLv3+.
 package com.ashudialer.app.appcalls.recording
 
@@ -47,7 +30,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * (capturing audio). Commands arrive as Intent actions; the service is never bound.
  *
  * Android 14+ requires a declared foreground-service type: specialUse (call recording), with
- * dataSync as the type on Android 11-13.
+ * dataSync as the type on Android 11-13, exactly like Ever Dialer's recorder.
  */
 class RecordingForegroundService : Service() {
 

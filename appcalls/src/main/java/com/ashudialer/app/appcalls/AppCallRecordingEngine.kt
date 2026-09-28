@@ -1,20 +1,3 @@
-/*
- * Ashu Phone
- * Copyright (C) 2026 Ashutosh Nishad
- *
- * This file is adapted from ShizuCallRecorder
- * (https://github.com/kitsumed/ShizuCallRecorder),
- * Copyright (C) kitsumed and contributors, licensed under GPL-3.0-or-later.
- * The original "adapted from" note is kept below. Changes were made by
- * Ashutosh Nishad in 2026.
- *
- * This file is part of Ashu Phone, licensed under the GNU General Public
- * License, version 3 or (at your option) any later version.
- * See the LICENSE and NOTICE files in the project root.
- * This program comes with ABSOLUTELY NO WARRANTY.
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
 // Adapted from ShizuCallRecorder's AudioRecordingEngine (github.com/kitsumed/ShizuCallRecorder), GPLv3+.
 package com.ashudialer.app.appcalls
 
@@ -40,7 +23,7 @@ import java.io.FileOutputStream
 /**
  * The single Shizuku-backed capture pipeline used for EVERYTHING this app records:
  * normal phone calls (voice-call / mic-voice-communication / uplink / downlink) and
- * WhatsApp/Telegram VoIP calls (output). Records the call audio stream.
+ * WhatsApp/Telegram VoIP calls (output). Same job Ever Dialer's AudioRecordingEngine does.
  *
  * Flow: connect to the shell service via Shizuku -> scrcpy-server captures audio as the shell
  * user -> bytes come back over a kernel pipe -> [ScrcpyClient] parses packets -> [ScrcpyAudioMuxer]

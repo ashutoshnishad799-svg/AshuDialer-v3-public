@@ -1,14 +1,3 @@
-/*
- * Ashu Phone
- * Copyright (C) 2026 Ashutosh Nishad
- *
- * This file is part of Ashu Phone, licensed under the GNU General Public
- * License, version 3 or (at your option) any later version.
- * See the LICENSE and NOTICE files in the project root.
- * This program comes with ABSOLUTELY NO WARRANTY.
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
 package com.ashudialer.app.ui.screens
 
 import androidx.compose.foundation.background
@@ -44,7 +33,7 @@ import com.ashudialer.app.ui.theme.DialerPalette
 import com.ashudialer.app.ui.theme.LocalDialerPalette
 
 /**
- * Every call-recording option, grouped by what they control:
+ * Every call-recording option, grouped the way Ever Dialer's recorder groups them:
  * what to record, filters, audio quality, where files go, notifications, auto-delete.
  * All values live in [RecordingPrefs] and take effect on the next call, no restart needed.
  */

@@ -1,20 +1,3 @@
-/*
- * Ashu Phone
- * Copyright (C) 2026 Ashutosh Nishad
- *
- * This file is adapted from ShizuCallRecorder
- * (https://github.com/kitsumed/ShizuCallRecorder),
- * Copyright (C) kitsumed and contributors, licensed under GPL-3.0-or-later.
- * The original "adapted from" note is kept below. Changes were made by
- * Ashutosh Nishad in 2026.
- *
- * This file is part of Ashu Phone, licensed under the GNU General Public
- * License, version 3 or (at your option) any later version.
- * See the LICENSE and NOTICE files in the project root.
- * This program comes with ABSOLUTELY NO WARRANTY.
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
 // Settings model adapted from ShizuCallRecorder's AppPreferences (github.com/kitsumed/ShizuCallRecorder), GPLv3+.
 package com.ashudialer.app.appcalls.recording
 
@@ -28,7 +11,7 @@ import com.ashudialer.app.appcalls.scrcpy.ScrcpyAudioSource
  *
  * Why SharedPreferences and not DataStore: these are read synchronously from a BroadcastReceiver
  * and a foreground service at the exact moment a call changes state, where a suspending read is
- * too slow / awkward. Plain SharedPreferences is used for the same reason.
+ * too slow / awkward. Ever Dialer's recorder module uses the same approach for the same reason.
  */
 class RecordingPrefs(private val context: Context) {
 

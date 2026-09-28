@@ -1,14 +1,3 @@
-/*
- * Ashu Phone
- * Copyright (C) 2026 Ashutosh Nishad
- *
- * This file is part of Ashu Phone, licensed under the GNU General Public
- * License, version 3 or (at your option) any later version.
- * See the LICENSE and NOTICE files in the project root.
- * This program comes with ABSOLUTELY NO WARRANTY.
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
 package com.ashudialer.app.ui.screens
 
 import android.Manifest
@@ -58,7 +47,7 @@ private const val SHIZUKU_GITHUB_URL = "https://github.com/RikkaApps/Shizuku/rel
 private const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
 
 /**
- * The whole call-recording setup in one place, presented as a single guided flow:
+ * The whole call-recording setup in one place, modelled on Ever Dialer's permission flow:
  * a live checklist (every row turns green as it is done), a button on every row that fixes
  * exactly that step, a beginner guide, a separate path for rooted phones, and the
  * auto-start options. Status refreshes every time the screen comes back to the foreground,

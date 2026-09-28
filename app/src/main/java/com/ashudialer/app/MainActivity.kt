@@ -1,14 +1,3 @@
-/*
- * Ashu Phone
- * Copyright (C) 2026 Ashutosh Nishad
- *
- * This file is part of Ashu Phone, licensed under the GNU General Public
- * License, version 3 or (at your option) any later version.
- * See the LICENSE and NOTICE files in the project root.
- * This program comes with ABSOLUTELY NO WARRANTY.
- *
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
 package com.ashudialer.app
 
 import android.content.Context
@@ -264,21 +253,6 @@ class MainActivity : ComponentActivity() {
      * setIntent(intent) keeps getIntent() in sync too, so a later recreate() (e.g. rotation) reads
      * this new intent rather than the one the very first onCreate saw.
      */
-    /**
-     * Second, independent integrity checkpoint. onCreate already gates the UI, but a single call site is a single
-     * thing to patch out. This one uses [IntegrityGuard.verifyFresh] (no cache) and runs every time the screen
-     * comes to the foreground, so removing only the first check is not enough. Only ever closes THIS screen; it
-     * never touches calls, the in-call UI or notification actions.
-     */
-    override fun onStart() {
-        super.onStart()
-        if (com.ashudialer.app.util.IntegrityGuard.verifyFresh(this) ==
-            com.ashudialer.app.util.IntegrityGuard.Verdict.TAMPERED ||
-            (application as? AshuDialerApp)?.tamperDetected == true) {
-            finishAffinity()
-        }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -718,18 +692,13 @@ class MainActivity : ComponentActivity() {
             ) {
                 isDefaultDialer = DialerPermissions.isDefaultDialer(context)
                 if (!isDefaultDialer) {
-                    // Some OEM role pickers return without changing the role (typically because
-                    // "Restricted settings" is blocking a sideloaded app). We do NOT jump to another
-                    // screen on our own any more: that felt like the app hijacking navigation. Tell the
-                    // person what to do instead, and let them choose to open Settings themselves.
+                    // Some OEM role pickers return without changing the role.
+                    // Send the person straight to Android's Default apps page
+                    // instead of leaving the setup flow stranded.
                     scope.launch {
                         kotlinx.coroutines.delay(700)
                         if (!DialerPermissions.isDefaultDialer(context)) {
-                            Toast.makeText(
-                                context,
-                                "Could not set as default. Open App info > Permissions (or Restricted settings) and turn on \"Allow restricted settings\", then try again.",
-                                Toast.LENGTH_LONG
-                            ).show()
+                            com.ashudialer.app.telecom.OemPermissionHelper.openDefaultAppsSettings(context)
                         }
                     }
                 }
@@ -1167,11 +1136,7 @@ class MainActivity : ComponentActivity() {
                                         DialerPermissions.requestDefaultDialerIntent(context)
                                     )
                                 } catch (_: Exception) {
-                                    Toast.makeText(
-                                    context,
-                                    "Could not set as default. Open App info > Permissions (or Restricted settings) and turn on \"Allow restricted settings\", then try again.",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                    com.ashudialer.app.telecom.OemPermissionHelper.openDefaultAppsSettings(context)
                                 }
                             },
                             onOpenDefaultAppsSettings = {
@@ -1397,11 +1362,7 @@ class MainActivity : ComponentActivity() {
                                                             DialerPermissions.requestDefaultDialerIntent(context)
                                                         )
                                                     } catch (_: Exception) {
-                                                        Toast.makeText(
-                                    context,
-                                    "Could not set as default. Open App info > Permissions (or Restricted settings) and turn on \"Allow restricted settings\", then try again.",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                                        com.ashudialer.app.telecom.OemPermissionHelper.openDefaultAppsSettings(context)
                                                     }
                                                 }
                                                 "Appearance" -> showThemePicker = true
@@ -1779,11 +1740,7 @@ class MainActivity : ComponentActivity() {
                                                 try {
                                                     defaultDialerLauncher.launch(DialerPermissions.requestDefaultDialerIntent(context))
                                                 } catch (_: Exception) {
-                                                    Toast.makeText(
-                                    context,
-                                    "Could not set as default. Open App info > Permissions (or Restricted settings) and turn on \"Allow restricted settings\", then try again.",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                                    com.ashudialer.app.telecom.OemPermissionHelper.openDefaultAppsSettings(context)
                                                 }
                                             },
                                             onRequestBluetooth = {
@@ -1966,19 +1923,6 @@ class MainActivity : ComponentActivity() {
                                                                 } catch (_: Exception) {
                                                                     Toast.makeText(context, "Please allow installs from this app in Android settings.", Toast.LENGTH_LONG).show()
                                                                 }
-                                                                return false
-                                                            }
-                                                            // Never hand the installer a file that is not a newer build of THIS app
-                                                            // signed with the SAME key. A tampered / swapped download is deleted.
-                                                            val verdict = com.ashudialer.app.util.ApkVerifier.verify(context, destination)
-                                                            if (verdict is com.ashudialer.app.util.ApkVerifier.Result.Rejected) {
-                                                                runCatching { destination.delete() }
-                                                                pendingUpdateApkReady = false
-                                                                Toast.makeText(
-                                                                    context,
-                                                                    "Update rejected: it is not a valid official build (${verdict.reason}). Nothing was installed.",
-                                                                    Toast.LENGTH_LONG
-                                                                ).show()
                                                                 return false
                                                             }
                                                             return try {
