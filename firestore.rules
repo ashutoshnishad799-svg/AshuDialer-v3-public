@@ -33,7 +33,10 @@ service cloud.firestore {
 
 
     match /phone_directory/{number} {
-      allow read: if request.auth != null;
+      // Single lookups only (the app never lists this collection). Blocking
+      // "list" stops anyone from downloading every registered number at once.
+      allow get: if request.auth != null;
+      allow list: if false;
       allow write: if request.auth != null && request.resource.data.uid == request.auth.uid;
     }
 

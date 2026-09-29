@@ -22,7 +22,8 @@ you have the right to contribute it.
 1. Install JDK 17 and Android Studio.
 2. Create **your own** Firebase project, add an Android app to it, and put its
    `google-services.json` in `app/`. It is git-ignored.
-3. `./gradlew assembleDebug`
+3. Open the project in Android Studio and press Run, or from a terminal with Gradle 8.7 installed: `gradle assembleDebug`
+   (this repo does not ship `gradlew`; run `gradle wrapper --gradle-version 8.7` once if you want one).
 
 Debug and local builds skip the official-signature check, so you can run and
 test your changes freely.

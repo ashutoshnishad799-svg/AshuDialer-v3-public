@@ -16,8 +16,8 @@ package com.ashudialer.app.util
  * formatting differences - spaces, dashes, parentheses, or a missing/extra
  * country code prefix. Two numbers are "the same" for matching purposes if
  * their normalized forms are equal, or if one contains the other (covers a
- * saved contact stored as "9129990819" matching an incoming/typed number of
- * "+919129990819", or vice versa).
+ * saved contact stored as "9876543210" matching an incoming/typed number of
+ * "+919876543210", or vice versa).
  *
  * This used to live as a private function inside DialerScreen.kt, used only
  * for its own predictive-match list. It's pulled out here because the exact
@@ -38,7 +38,7 @@ fun normalizePhoneNumberForMatch(raw: String): String {
  * True if [a] and [b] refer to the same underlying phone number once
  * formatting differences are normalized away - exact match, or one being a
  * suffix of the other (handles a stored number missing a country code that
- * the other has, e.g. saved "9129990819" matching typed "+919129990819").
+ * the other has, e.g. saved "9876543210" matching typed "+919876543210").
  *
  * Deliberately NOT a plain substring check (`contains` anywhere in the
  * string) - that was the original implementation, and it was a real bug:
