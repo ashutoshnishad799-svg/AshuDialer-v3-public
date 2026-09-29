@@ -121,6 +121,9 @@ class VideoCallSignalingRepository {
                 mapOf(
                     "callerUid" to callerUid,
                     "calleeNumber" to calleeNumber,
+                    // Normalized (last 10 digits) so "+91 98765-43210" and
+                    // "9876543210" match the same person on the receiving side.
+                    "calleeKey" to normalizePhoneForLookup(calleeNumber),
                     "callerCarrierId" to callerCarrierId,
                     "callerNumber" to callerNumber,
                     "offerSdp" to offerSdp,
@@ -219,7 +222,7 @@ class VideoCallSignalingRepository {
             return@callbackFlow
         }
         val registration = collection
-            .whereEqualTo("calleeNumber", myNumber)
+            .whereEqualTo("calleeKey", normalized)
             .whereEqualTo("status", SignalingSession.STATUS_RINGING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener

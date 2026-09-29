@@ -91,7 +91,13 @@ abstract class AshuDialerDatabase : RoomDatabase() {
                     // app/schemas) so the NEXT version bump should ship with
                     // a real addMigrations(...) entry rather than relying on
                     // this line. Do not bump `version` without one.
-                    .fallbackToDestructiveMigration()
+                    // FIX: the comment above says the blanket upgrade fallback was
+                    // removed, but the call was still here, so ANY future version
+                    // bump silently wiped blocked numbers, notes and the Private
+                    // Space password. Destructive reset is now allowed only from
+                    // the old pre-release schema versions (1..9). From version 10
+                    // onward a real addMigrations(...) entry is required.
+                    .fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6, 7, 8, 9)
                     .build().also { INSTANCE = it }
             }
     }
