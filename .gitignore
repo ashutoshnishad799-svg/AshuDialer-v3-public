@@ -8,3 +8,10 @@ local.properties
 captures/
 *.jks
 *.keystore
+
+# Secrets - never commit these
+google-services.json
+*.p12
+*.pfx
+keystore.properties
+.env

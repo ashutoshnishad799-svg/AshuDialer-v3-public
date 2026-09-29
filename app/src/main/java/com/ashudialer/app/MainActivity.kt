@@ -1,3 +1,13 @@
+/*
+ * Ashu Phone
+ * Copyright (C) 2026 Ashutosh Nishad
+ *
+ * This file is part of Ashu Phone, licensed under the GNU General Public
+ * License, version 3 or (at your option) any later version.
+ * See the LICENSE file in the project root. This program comes with ABSOLUTELY NO WARRANTY.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 package com.ashudialer.app
 
 import android.content.Context
@@ -691,17 +701,11 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.StartActivityForResult()
             ) {
                 isDefaultDialer = DialerPermissions.isDefaultDialer(context)
-                if (!isDefaultDialer) {
-                    // Some OEM role pickers return without changing the role.
-                    // Send the person straight to Android's Default apps page
-                    // instead of leaving the setup flow stranded.
-                    scope.launch {
-                        kotlinx.coroutines.delay(700)
-                        if (!DialerPermissions.isDefaultDialer(context)) {
-                            com.ashudialer.app.telecom.OemPermissionHelper.openDefaultAppsSettings(context)
-                        }
-                    }
-                }
+                // No automatic redirect to Settings here on purpose: when the
+                // system shows "App was denied access to be default Phone app"
+                // (restricted settings), the person should be able to just
+                // close that dialog and stay on this screen. The manual
+                // "Open Settings" button and the hint below it are enough.
                 // THE FIX for "Set as default dialer doesn't work until I go
                 // do it manually from Settings myself": the exact same
                 // staleness explained in permissionLauncher's callback below

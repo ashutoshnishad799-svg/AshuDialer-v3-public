@@ -1,3 +1,13 @@
+/*
+ * Ashu Phone
+ * Copyright (C) 2026 Ashutosh Nishad
+ *
+ * This file is part of Ashu Phone, licensed under the GNU General Public
+ * License, version 3 or (at your option) any later version.
+ * See the LICENSE file in the project root. This program comes with ABSOLUTELY NO WARRANTY.
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 package com.ashudialer.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
@@ -213,6 +223,21 @@ fun PermissionsScreen(
                     ) {
                         Text("Trouble with the dialog above? Open Settings", fontSize = 13.sp)
                     }
+                    Spacer(Modifier.height(12.dp))
+                    // Many devices (Android 13+, apps installed outside the Play
+                    // Store) block the default-dialer request with "App was denied
+                    // access to be default Phone app". Tell the person the fix
+                    // right here, instead of leaving them stuck on the screen.
+                    Text(
+                        "Dialog says \"App was denied access\"? Go to Settings > Apps > Ashu Dialer > App info, " +
+                            "tap the ⋮ menu (top right) and choose \"Allow restricted settings\". " +
+                            "Then come back and tap Set as default dialer again.",
+                        fontSize = 12.sp,
+                        color = palette.textSecondary,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 17.sp,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                    )
                 }
                 else -> Button(
                     onClick = {},
