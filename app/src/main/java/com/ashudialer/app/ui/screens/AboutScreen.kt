@@ -195,7 +195,7 @@ fun AboutScreen(
                 }
             }
 
-            SectionLabel("WHAT'S NEW", palette)
+            AboutSectionLabel("WHAT'S NEW", palette)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -213,7 +213,7 @@ fun AboutScreen(
                 }
             }
 
-            SectionLabel("WHAT'S INSIDE", palette)
+            AboutSectionLabel("WHAT'S INSIDE", palette)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -239,7 +239,7 @@ fun AboutScreen(
                 }
             }
 
-            SectionLabel("OPEN-SOURCE CREDITS", palette)
+            AboutSectionLabel("OPEN-SOURCE CREDITS", palette)
             Text(
                 "Ashu Phone is free software under the GNU GPL v3 or later. It stands on the work of these projects \u2014 thank you.",
                 fontSize = 12.5.sp,
@@ -283,7 +283,7 @@ fun AboutScreen(
 }
 
 @Composable
-private fun SectionLabel(text: String, palette: DialerPalette) {
+private fun AboutSectionLabel(text: String, palette: DialerPalette) {
     Text(
         text,
         fontSize = 12.sp,
