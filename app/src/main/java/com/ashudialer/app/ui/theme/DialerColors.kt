@@ -44,7 +44,18 @@ data class DialerPalette(
     // brush especially looked out of place against a flat black theme
     // that's meant to be stark rather than soft/glassy like every other
     // theme in this app intentionally is.
-    val flatSurfaces: Boolean = false
+    val flatSurfaces: Boolean = false,
+    // v4 "Liquid Glass": true on the glass themes. liquidGlass() then draws real glass - a translucent
+    // white pane with a bright specular rim - instead of tinting cardBackground, and MainActivity puts
+    // the moving AuroraBackground behind the whole app.
+    val glass: Boolean = false,
+    // Up to four light colours the AuroraBackground blobs use. Empty = the accent colour is used.
+    val auroraColors: List<Color> = emptyList(),
+    // The screen background as an always-OPAQUE brush. For every normal palette it is simply
+    // `background`. For the glass themes the theme provides `background` = transparent (so the moving
+    // aurora behind the whole app shows through every screen); screens that must hide what is beneath
+    // them (detail pages, overlays, dialogs) paint this one instead.
+    val opaqueBackground: Brush = background
 )
 
 
@@ -234,7 +245,7 @@ val RoseGoldPalette = DialerPalette(
 
 val DarkModePalette = DialerPalette(
     id = "darkmode",
-    displayName = "Dark Mode",
+    displayName = "Black",
     isDark = true,
     background = Brush.verticalGradient(colors = listOf(Color(0xFF000000), Color(0xFF000000))),
     solidBackground = Color(0xFF000000),
@@ -459,8 +470,122 @@ val RainbowPalette = DialerPalette(
     swatchEnd = Color(0xFF9D8CFF)
 )
 
+// ---------------------------------------------------------------------------------------------
+// v4 themes. Two Liquid Glass looks (dark and light) and two refined solid themes. All four keep
+// textSecondary >= 4.5:1 against their own background, like every other palette in this file.
+// ---------------------------------------------------------------------------------------------
+
+/** Deep midnight glass: translucent white panes floating over slow azure / teal / violet light. */
+val LiquidGlassPalette = DialerPalette(
+    id = "liquid",
+    displayName = "Liquid Glass",
+    isDark = true,
+    background = Brush.verticalGradient(
+        colors = listOf(Color(0xFF060A18), Color(0xFF0A1230), Color(0xFF081A2C))
+    ),
+    solidBackground = Color(0xFF070C1E),
+    // Opaque on purpose: dialogs / bottom sheets read cardBackground directly and must stay legible.
+    // The glass panes themselves do NOT use it (see liquidGlass' glass branch).
+    cardBackground = Color(0xFF111A36),
+    cardBorder = Color(0xFFFFFFFF).copy(alpha = 0.22f),
+    navBackground = Color(0xFF0D1530),
+    accent = Color(0xFF7FB2FF),
+    accentSoft = Color(0xFF7FB2FF).copy(alpha = 0.24f),
+    textPrimary = Color(0xFFF5F8FF),
+    textSecondary = Color(0xFFA9B5D3),
+    danger = Color(0xFFFF6B6B),
+    searchBackground = Color(0xFFFFFFFF).copy(alpha = 0.10f),
+    avatarBackground = Color(0xFFFFFFFF).copy(alpha = 0.16f),
+    callGreen = Color(0xFF3DDC84),
+    swatchStart = Color(0xFF16245C),
+    swatchEnd = Color(0xFF7FB2FF),
+    glass = true,
+    auroraColors = listOf(Color(0xFF3F6BFF), Color(0xFF00BFA6), Color(0xFF8B5CF6), Color(0xFF2B7BFF))
+)
+
+/** Light frosted glass: milky white panes over soft sky, lilac and mint light. */
+val FrostGlassPalette = DialerPalette(
+    id = "frost",
+    displayName = "Frost Glass",
+    isDark = false,
+    background = Brush.verticalGradient(
+        colors = listOf(Color(0xFFEAF3FF), Color(0xFFE4E8FF), Color(0xFFDDF4F1))
+    ),
+    solidBackground = Color(0xFFE6EEFF),
+    cardBackground = Color(0xFFFFFFFF),
+    cardBorder = Color(0xFFFFFFFF).copy(alpha = 0.75f),
+    navBackground = Color(0xFFF3F7FF),
+    accent = Color(0xFF2F6BFF),
+    accentSoft = Color(0xFF2F6BFF).copy(alpha = 0.14f),
+    textPrimary = Color(0xFF0F1B3A),
+    textSecondary = Color(0xFF51608A),
+    danger = Color(0xFFD93025),
+    searchBackground = Color(0xFFFFFFFF).copy(alpha = 0.7f),
+    avatarBackground = Color(0xFFFFFFFF).copy(alpha = 0.8f),
+    callGreen = Color(0xFF22B55A),
+    swatchStart = Color(0xFFEAF3FF),
+    swatchEnd = Color(0xFF2F6BFF),
+    glass = true,
+    auroraColors = listOf(Color(0xFF8FB8FF), Color(0xFFC4B5FD), Color(0xFF8EE6D3), Color(0xFFA5C8FF))
+)
+
+/** Warm graphite with a restrained gold accent - quiet, premium, no colour noise. */
+val ObsidianPalette = DialerPalette(
+    id = "obsidian",
+    displayName = "Obsidian Gold",
+    isDark = true,
+    background = Brush.verticalGradient(colors = listOf(Color(0xFF0E0E10), Color(0xFF131316))),
+    solidBackground = Color(0xFF0E0E10),
+    cardBackground = Color(0xFF1A1A1E),
+    cardBorder = Color(0xFF34343B),
+    navBackground = Color(0xFF151518),
+    accent = Color(0xFFE5B95C),
+    accentSoft = Color(0xFF2E2614),
+    textPrimary = Color(0xFFF4F1EA),
+    textSecondary = Color(0xFF9D9A92),
+    danger = Color(0xFFFF6459),
+    searchBackground = Color(0xFF1A1A1E),
+    avatarBackground = Color(0xFF2A2A30),
+    callGreen = Color(0xFF3CCB7F),
+    swatchStart = Color(0xFF1A1A1E),
+    swatchEnd = Color(0xFFE5B95C)
+)
+
+/** Deep forest night with a cool mint accent. */
+val EmeraldNightPalette = DialerPalette(
+    id = "emerald",
+    displayName = "Emerald Night",
+    isDark = true,
+    background = Brush.verticalGradient(colors = listOf(Color(0xFF04120E), Color(0xFF07201A))),
+    solidBackground = Color(0xFF04120E),
+    cardBackground = Color(0xFF0D241D),
+    cardBorder = Color(0xFF1F4A3C),
+    navBackground = Color(0xFF081C16),
+    accent = Color(0xFF4FE3B0),
+    accentSoft = Color(0xFF123B2E),
+    textPrimary = Color(0xFFEAFBF4),
+    textSecondary = Color(0xFF8FB5A6),
+    danger = Color(0xFFFF6B6B),
+    searchBackground = Color(0xFF0D241D),
+    avatarBackground = Color(0xFF16372D),
+    callGreen = Color(0xFF38D67A),
+    swatchStart = Color(0xFF0D241D),
+    swatchEnd = Color(0xFF4FE3B0)
+)
+
+/**
+ * The two themes that ship as the DEFAULT look ("Auto" picks one of them from the phone's light/dark
+ * setting): a simple White and a simple Black. Every other theme is an optional extra.
+ */
+val DefaultPalettes = listOf(WhitePalette, DarkModePalette)
+
+/** Everything the person can choose. Defaults first, then the optional looks. */
 val AllPalettes = listOf(
-    GradientPalette, OceanPalette, SunsetPalette, RoseGoldPalette, WhitePalette, MidnightPalette, VioletPalette, DarkModePalette, RainbowPalette, PureBlackPalette, ProfessionalPalette
+    WhitePalette, DarkModePalette,
+    PureBlackPalette, ProfessionalPalette,
+    LiquidGlassPalette, FrostGlassPalette,
+    ObsidianPalette, EmeraldNightPalette,
+    GradientPalette, OceanPalette, SunsetPalette, RoseGoldPalette, MidnightPalette, VioletPalette, RainbowPalette
 )
 
 fun paletteById(id: String): DialerPalette = AllPalettes.find { it.id == id } ?: GradientPalette

@@ -14,6 +14,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Shape
+import com.ashudialer.app.ui.theme.AshuStyle
+import com.ashudialer.app.ui.theme.LocalAshuStyle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
@@ -40,6 +44,12 @@ fun Avatar(
     modifier: Modifier = Modifier
 ) {
     val palette = LocalDialerPalette.current
+    // v4 Personalize > Avatar shape
+    val avatarShape: Shape = when (LocalAshuStyle.current.avatarShape) {
+        AshuStyle.AVATAR_SQUIRCLE -> RoundedCornerShape(percent = 34)
+        AshuStyle.AVATAR_ROUNDED -> RoundedCornerShape(percent = 20)
+        else -> CircleShape
+    }
 
     if (!photoUri.isNullOrBlank()) {
         AsyncImage(
@@ -47,7 +57,7 @@ fun Avatar(
             contentDescription = name,
             modifier = modifier
                 .size(size)
-                .clip(CircleShape)
+                .clip(avatarShape)
         )
         return
     }
@@ -67,7 +77,7 @@ fun Avatar(
     Box(
         modifier = modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(avatarShape)
             .then(backgroundModifier),
         contentAlignment = Alignment.Center
     ) {

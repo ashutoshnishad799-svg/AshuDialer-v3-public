@@ -33,6 +33,7 @@ import com.ashudialer.app.data.SignalingSession
 import com.ashudialer.app.ui.screens.VideoCallPhase
 import com.ashudialer.app.ui.screens.VideoCallScreen
 import com.ashudialer.app.ui.theme.AshuDialerTheme
+import com.ashudialer.app.data.toAshuStyle
 import com.ashudialer.app.util.isWhatsAppInstalled
 import com.ashudialer.app.util.openWhatsAppChat
 import kotlinx.coroutines.flow.first
@@ -419,7 +420,7 @@ class VideoCallActivity : ComponentActivity() {
                 finish()
             }
 
-            AshuDialerTheme(themeId = themeId, fontSizeIndex = settings.fontSizeIndex, buttonDepth = settings.buttonDepth) {
+            AshuDialerTheme(themeId = themeId, fontSizeIndex = settings.fontSizeIndex, buttonDepth = settings.buttonDepth, style = settings.toAshuStyle()) {
                 // Phase-aware back handling - see the long comment above
                 // onBackPressedDispatcher's old registration (now removed)
                 // for why this moved here. RINGING_INCOMING: back declines

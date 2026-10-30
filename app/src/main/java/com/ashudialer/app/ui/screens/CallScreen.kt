@@ -282,7 +282,7 @@ fun CallScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(palette.background, alpha = if (frostedGlassEnabled) 0.92f else 1f)
+            .background(palette.opaqueBackground, alpha = if (frostedGlassEnabled) 0.92f else 1f)
             .graphicsLayer {
                 alpha = screenAlpha
                 translationY = screenTranslationY
@@ -752,6 +752,9 @@ private fun RecordingWaveformBar(seconds: Int, mode: RecordingMode?, looksSilent
                     )
                 }
             }
+            // v4: bookmark the current moment of the recording (optional, see recording settings)
+            Spacer(Modifier.width(10.dp))
+            MarkMomentButton()
         }
 
         if (micIsSystemMuted) {

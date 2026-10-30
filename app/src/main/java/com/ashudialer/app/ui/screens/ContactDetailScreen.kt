@@ -112,7 +112,7 @@ fun ContactDetailScreen(
 ) {
     val palette = LocalDialerPalette.current
 
-    Box(modifier = modifier.fillMaxSize().background(palette.background)) {
+    Box(modifier = modifier.fillMaxSize().background(palette.opaqueBackground)) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

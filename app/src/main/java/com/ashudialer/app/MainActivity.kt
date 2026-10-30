@@ -73,6 +73,7 @@ import com.ashudialer.app.ui.components.rememberButtonHaptic
 import com.ashudialer.app.ui.screens.*
 import com.ashudialer.app.ui.theme.LocalDialerPalette
 import com.ashudialer.app.ui.theme.AshuDialerTheme
+import com.ashudialer.app.data.toAshuStyle
 import com.ashudialer.app.util.phoneNumbersMatch
 import com.ashudialer.app.data.db.getPreferredSimId
 import com.ashudialer.app.util.openWhatsAppChat
@@ -81,7 +82,7 @@ import com.ashudialer.app.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private enum class OverlayScreen { NONE, ACCOUNT, PRIVACY_POLICY, SETTINGS, BLOCKED_NUMBERS, REPORTED_SPAM, HELP_FEEDBACK, NOTES, RECORDINGS, RECORDING_GUIDE, RECORDING_SETTINGS, RECORDING_SETUP, RECORDING_APP_CALLS_SETUP, SIM_ROUTING, VIBRATION_PATTERNS, LOCAL_BACKUP, QUIET_HOURS, CALL_INSIGHTS, ABOUT, PRIVATE_SPACE, ADD_CONTACT, UPDATE_CHECK, INCOMING_CALL_STYLE }
+private enum class OverlayScreen { NONE, ACCOUNT, PRIVACY_POLICY, SETTINGS, BLOCKED_NUMBERS, REPORTED_SPAM, HELP_FEEDBACK, NOTES, RECORDINGS, RECORDING_GUIDE, RECORDING_SETTINGS, RECORDING_SETUP, RECORDING_APP_CALLS_SETUP, SIM_ROUTING, VIBRATION_PATTERNS, LOCAL_BACKUP, QUIET_HOURS, CALL_INSIGHTS, ABOUT, PRIVATE_SPACE, ADD_CONTACT, UPDATE_CHECK, INCOMING_CALL_STYLE, PERSONALIZE }
 
 // THE FIX for the Modules/Root-setup screen "freezing" after tapping
 // "Open Magisk" and coming back: overlay used to be plain `remember`,
@@ -970,7 +971,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            AshuDialerTheme(themeId = themeId, fontSizeIndex = settings.fontSizeIndex, buttonDepth = settings.buttonDepth) {
+            AshuDialerTheme(themeId = themeId, fontSizeIndex = settings.fontSizeIndex, buttonDepth = settings.buttonDepth, style = settings.toAshuStyle()) {
                 val palette = LocalDialerPalette.current
                 val buttonHaptic = rememberButtonHaptic(settings.vibrateOnButtonPress)
 
@@ -1370,6 +1371,7 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 }
                                                 "Appearance" -> showThemePicker = true
+                                                "Personalize" -> overlay = OverlayScreen.PERSONALIZE
                                                 "Account" -> overlay = OverlayScreen.ACCOUNT
                                                 "Backup" -> overlay = OverlayScreen.ACCOUNT
                                                 "Local Backup" -> overlay = OverlayScreen.LOCAL_BACKUP
@@ -1430,7 +1432,11 @@ class MainActivity : ComponentActivity() {
                                 enter = slideInHorizontally { it } + fadeIn(),
                                 exit = slideOutHorizontally { it } + fadeOut()
                             ) {
-                                Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
+                                Box(modifier = Modifier.fillMaxSize().background(palette.opaqueBackground)) {
+                                    // v4: glass themes keep their moving light on overlay screens too.
+                                    if (palette.glass && com.ashudialer.app.ui.theme.LocalAshuStyle.current.aurora) {
+                                        com.ashudialer.app.ui.components.AuroraBackground(palette = palette)
+                                    }
                                     // AnimatedVisibility above only fires when overlay
                                     // transitions to/from NONE - navigating from one
                                     // overlay screen straight to another (e.g. Settings
@@ -1840,6 +1846,10 @@ class MainActivity : ComponentActivity() {
                                                 recordingFlowFromSettings = false
                                                 overlay = OverlayScreen.RECORDING_SETUP
                                             },
+                                            groupByContact = settings.recordingsGroupByContact,
+                                            onGroupByContactChange = { viewModel.setPersonalizeBool(com.ashudialer.app.data.PKey.REC_GROUP, it) },
+                                            sortModeId = settings.recordingsSort,
+                                            onSortModeChange = { viewModel.setPersonalizeString(com.ashudialer.app.data.PKey.REC_SORT, it) },
                                             modifier = Modifier.fillMaxSize()
                                         )
                                         OverlayScreen.RECORDING_SETTINGS -> com.ashudialer.app.ui.screens.RecordingSettingsScreen(
@@ -2044,6 +2054,22 @@ class MainActivity : ComponentActivity() {
                                             onGlassChange = { viewModel.setIncomingCallGlass(it) },
                                             avatarPulseEnabled = settings.incomingCallAvatarPulse,
                                             onAvatarPulseChange = { viewModel.setIncomingCallAvatarPulse(it) },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                        OverlayScreen.PERSONALIZE -> com.ashudialer.app.ui.screens.PersonalizeScreen(
+                                            settings = settings,
+                                            themeId = themeId,
+                                            onThemeSelected = { id -> viewModel.setTheme(id) },
+                                            onInt = { n, v -> viewModel.setPersonalizeInt(n, v) },
+                                            onLong = { n, v -> viewModel.setPersonalizeLong(n, v) },
+                                            onString = { n, v -> viewModel.setPersonalizeString(n, v) },
+                                            onBool = { n, v -> viewModel.setPersonalizeBool(n, v) },
+                                            onFontSizeIndex = { viewModel.setFontSizeIndex(it) },
+                                            onButtonDepth = { viewModel.setButtonDepth(it) },
+                                            onVibrateOnButtonPress = { viewModel.setVibrateOnButtonPress(it) },
+                                            onOpenIncomingCallStyle = { overlay = OverlayScreen.INCOMING_CALL_STYLE },
+                                            onReset = { viewModel.resetPersonalization() },
+                                            onBack = { overlay = OverlayScreen.NONE },
                                             modifier = Modifier.fillMaxSize()
                                         )
                                         OverlayScreen.NONE -> {}

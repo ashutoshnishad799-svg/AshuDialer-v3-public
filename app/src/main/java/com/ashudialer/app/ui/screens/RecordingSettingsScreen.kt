@@ -153,6 +153,10 @@ fun RecordingSettingsScreen(
                 }
             }
 
+            // v4: optional cloud backup + smart extras
+            item { CloudBackupCard(palette) }
+            item { RecordingExtrasCard(palette, prefs) }
+
             item { Label("What to record", palette) }
             item {
                 Card(palette) {
@@ -215,6 +219,14 @@ fun RecordingSettingsScreen(
                         bitRate = steps[(steps.indexOf(bitRate).let { if (it < 0) 0 else it } + 1) % steps.size]
                         prefs.audioBitRate = bitRate
                     }
+                    Spacer(Modifier.height(10.dp))
+                    Text("Quick quality preset", fontSize = 12.5.sp, color = palette.textSecondary)
+                    Spacer(Modifier.height(6.dp))
+                    Segmented(
+                        options = listOf("16000" to "Saver", "0" to "Auto", "64000" to "High", "128000" to "Studio"),
+                        selected = bitRate.toString(),
+                        palette = palette
+                    ) { bitRate = it.toInt(); prefs.audioBitRate = bitRate }
                 }
             }
 

@@ -258,7 +258,10 @@ class RecordingForegroundService : Service() {
         }
         // On a fallback restart the person still sees "recording" the whole time, so the timer keeps
         // its original start and the state goes straight from one Active to the next.
-        if (sourceOverride == null) startedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
+        if (sourceOverride == null) {
+            startedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
+            RecordingMarks.clear()
+        }
         state = RecordingServiceState.Active(engine, false, session)
         if (sourceOverride == null) {
             notifications.vibrate()
@@ -367,20 +370,40 @@ class RecordingForegroundService : Service() {
         val active = state as? RecordingServiceState.Active
         val session = state.session
         var saved: RecordingStorage.SavedRecording? = null
+        var discardedShort = false
 
         if (active != null) {
             AppCallsLogger.i(TAG, "Stopping active recording and saving file...")
             active.engine.stop(shellService)
             val temp = tempFile
-            if (temp != null) {
+            val minSeconds = prefs.discardShorterThanSec
+            val lengthMs = if (startedAtElapsedMs > 0L) android.os.SystemClock.elapsedRealtime() - startedAtElapsedMs else Long.MAX_VALUE
+            if (temp != null && minSeconds > 0 && lengthMs < minSeconds * 1000L) {
+                // v4 optional: too short to be worth keeping (a mis-tap, an instantly ended call).
+                runCatching { temp.delete() }
+                discardedShort = true
+                AppCallsLogger.i(TAG, "Discarded a ${lengthMs / 1000}s recording (shorter than ${minSeconds}s)")
+            } else if (temp != null) {
                 saved = RecordingStorage.finalize(this, temp, active.engine.activeCodec, prefs, session)
             }
             notifications.vibrate(long = true)
             if (saved != null) {
                 notifications.toast("Recording saved")
                 notifications.showPostCall(saved, session)
+                // v4: attach the bookmarks made during the call, then hand the file to the optional
+                // cloud backup (a no-op unless the person turned it on and picked a folder).
+                saved?.let { rec ->
+                    runCatching {
+                        val marks = RecordingMarks.drain()
+                        if (marks.isNotEmpty()) {
+                            RecordingMetaStore(applicationContext).update(rec.file.name) { it.copy(marks = marks) }
+                        }
+                        com.ashudialer.app.appcalls.cloud.CloudSync.onRecordingSaved(applicationContext, rec.file, rec.uri)
+                    }
+                }
             } else {
-                notifications.toast("Nothing was recorded")
+                RecordingMarks.clear()
+                notifications.toast(if (discardedShort) "Too short to keep \u2014 discarded" else "Nothing was recorded")
             }
         } else if (state is RecordingServiceState.Starting) {
             // Cancelled before capture began: make sure no partial temp file lingers.

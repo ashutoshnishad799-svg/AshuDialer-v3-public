@@ -41,6 +41,16 @@ class RecordingPrefs(private val context: Context) {
         get() = prefs.getBoolean("call_recording_enabled", false)
         set(v) = prefs.edit { putBoolean("call_recording_enabled", v) }
 
+    /** v4, optional: a recording shorter than this many seconds is discarded instead of saved (0 = keep all). */
+    var discardShorterThanSec: Int
+        get() = prefs.getInt("discard_shorter_than_sec", 0)
+        set(v) = prefs.edit { putInt("discard_shorter_than_sec", v.coerceIn(0, 60)) }
+
+    /** v4, optional: show the "mark this moment" flag on the call screen's recording bar. */
+    var showMarkButton: Boolean
+        get() = prefs.getBoolean("show_mark_button", true)
+        set(v) = prefs.edit { putBoolean("show_mark_button", v) }
+
     // DEFAULT IS false ON PURPOSE. Turning the master "Call recording" switch on
     // must only make manual recording available (the Record button on the call
     // screen). It must NOT silently start recording every call - that has to be a

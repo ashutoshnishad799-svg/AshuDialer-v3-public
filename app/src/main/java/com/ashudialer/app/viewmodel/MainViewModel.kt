@@ -829,6 +829,27 @@ class MainViewModel(
         viewModelScope.launch { appSettingsRepository.setButtonDepth(depth) }
     }
 
+    // v4 Personalize / Recordings-UI preferences (names are the constants in PKey)
+    fun setPersonalizeInt(name: String, value: Int) {
+        viewModelScope.launch { appSettingsRepository.setPersonalizeInt(name, value) }
+    }
+
+    fun setPersonalizeLong(name: String, value: Long) {
+        viewModelScope.launch { appSettingsRepository.setPersonalizeLong(name, value) }
+    }
+
+    fun setPersonalizeString(name: String, value: String) {
+        viewModelScope.launch { appSettingsRepository.setPersonalizeString(name, value) }
+    }
+
+    fun setPersonalizeBool(name: String, value: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setPersonalizeBool(name, value) }
+    }
+
+    fun resetPersonalization() {
+        viewModelScope.launch { appSettingsRepository.resetPersonalization() }
+    }
+
     fun setIncomingCallStyle(style: String) {
         viewModelScope.launch { appSettingsRepository.setIncomingCallStyle(style) }
     }

@@ -69,313 +69,9 @@ import java.util.Locale
 import com.ashudialer.app.ui.components.glassCard
 
 
-@Composable
-fun RecordingsScreen(
-    recordings: List<File>,
-    onBack: () -> Unit,
-    onPlay: (File) -> Unit,
-    onShare: (File) -> Unit,
-    onDelete: (File) -> Unit,
-    onMoveToPrivateSpace: (List<File>) -> Unit = {},
-    onOpenRecordingGuide: () -> Unit = {},
-    onOpenRecordingSettings: () -> Unit = {},
-    onOpenRecordingSetup: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    val palette = LocalDialerPalette.current
-    // Which recording (if any) is currently expanded with the in-app player.
-    // Only one at a time, matching how a mini-player normally behaves.
-    var expandedFile by remember { mutableStateOf<File?>(null) }
-
-    // Multi-select state: empty set means "not in selection mode" at all -
-    // the row long-press handler enters selection mode by adding the first
-    // file, and clearing back to empty (via the X in the selection app bar,
-    // or removing the last selected item) exits it. This means selection
-    // mode is fully derived from selectedFiles rather than needing its own
-    // separate boolean that could get out of sync with the set's contents.
-    var selectedFiles by remember { mutableStateOf(setOf<File>()) }
-    val inSelectionMode = selectedFiles.isNotEmpty()
-
-    // Separate pages for normal calls, WhatsApp, Telegram, Instagram and Snapchat (plus "All").
-    var kind by remember { mutableStateOf(RecordingKind.ALL) }
-    val visibleRecordings = remember(recordings, kind) {
-        if (kind == RecordingKind.ALL) recordings else recordings.filter { kindOf(it) == kind }
-    }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        if (inSelectionMode) {
-            SelectionAppBar(
-                selectedCount = selectedFiles.size,
-                onClose = { selectedFiles = emptySet() },
-                onMoveToPrivateSpace = {
-                    onMoveToPrivateSpace(selectedFiles.toList())
-                    selectedFiles = emptySet()
-                },
-                onDeleteSelected = {
-                    if (expandedFile in selectedFiles) expandedFile = null
-                    selectedFiles.forEach { onDelete(it) }
-                    selectedFiles = emptySet()
-                },
-                palette = palette
-            )
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = palette.textPrimary)
-                }
-                Spacer(Modifier.width(4.dp))
-                Text("My Recordings", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary, modifier = Modifier.weight(1f))
-                IconButton(onClick = onOpenRecordingSettings) {
-                    Icon(Icons.Filled.Settings, contentDescription = "Recording settings", tint = palette.textSecondary)
-                }
-            }
-        }
-
-        if (!inSelectionMode) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(palette.accentSoft)
-                    .clickable { onOpenRecordingSetup() }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.HelpOutline, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    "Recording not working? Open the setup checklist (Shizuku & permissions). New to Shizuku? The ? button explains every step.",
-                    fontSize = 12.5.sp, color = palette.textPrimary, modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onOpenRecordingGuide, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.HelpOutline, contentDescription = "Beginner guide", tint = palette.accent, modifier = Modifier.size(20.dp))
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                RecordingKind.entries.forEach { k ->
-                    val count = if (k == RecordingKind.ALL) recordings.size else recordings.count { kindOf(it) == k }
-                    Text(
-                        "${k.title} ($count)",
-                        fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold,
-                        color = if (kind == k) palette.solidBackground else palette.textPrimary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(if (kind == k) palette.accent else palette.accentSoft)
-                            .clickable { kind = k }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        if (visibleRecordings.isEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(Icons.Filled.FiberManualRecord, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(40.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("No recordings yet", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (kind == RecordingKind.WHATSAPP || kind == RecordingKind.TELEGRAM || kind == RecordingKind.INSTAGRAM || kind == RecordingKind.SNAPCHAT)
-                        "${kind.title} calls are recorded automatically once they are turned on in Recording settings."
-                    else "Calls are recorded automatically once setup is finished. You can also tap Record during a call.",
-                    fontSize = 13.sp, color = palette.textSecondary
-                )
-            }
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp, vertical = 12.dp)) {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().glassCard(palette, 18.dp)
-                    ) {
-                        visibleRecordings.forEachIndexed { index, file ->
-                            RecordingRow(
-                                file = file,
-                                expanded = expandedFile == file,
-                                inSelectionMode = inSelectionMode,
-                                selected = file in selectedFiles,
-                                onToggleExpand = {
-                                    expandedFile = if (expandedFile == file) null else file
-                                },
-                                onToggleSelect = {
-                                    selectedFiles = if (file in selectedFiles) selectedFiles - file else selectedFiles + file
-                                },
-                                onLongPress = {
-                                    if (!inSelectionMode) selectedFiles = setOf(file)
-                                },
-                                onShare = { onShare(file) },
-                                onDelete = {
-                                    if (expandedFile == file) expandedFile = null
-                                    onDelete(file)
-                                }
-                            )
-                            if (index != visibleRecordings.lastIndex) {
-                                HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Replaces the normal title bar while one or more recordings are selected -
- * the standard Android "contextual action bar" pattern (Gmail, Photos,
- * Files all do this): a close button to cancel the selection, a count, and
- * the action(s) that apply to the current selection. Only one action exists
- * today (move to Private Space), but this bar is the natural place future
- * batch actions (e.g. bulk delete) would go too.
- */
-@Composable
-private fun SelectionAppBar(
-    selectedCount: Int,
-    onClose: () -> Unit,
-    onMoveToPrivateSpace: () -> Unit,
-    onDeleteSelected: () -> Unit,
-    palette: com.ashudialer.app.ui.theme.DialerPalette
-) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onClose) {
-            Icon(Icons.Filled.Close, contentDescription = "Cancel selection", tint = palette.textPrimary)
-        }
-        Spacer(Modifier.width(4.dp))
-        Text("$selectedCount selected", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary, modifier = Modifier.weight(1f))
-        IconButton(onClick = onMoveToPrivateSpace) {
-            Icon(Icons.Filled.Lock, contentDescription = "Move to Private Space", tint = palette.accent)
-        }
-        IconButton(onClick = { showDeleteConfirm = true }) {
-            Icon(Icons.Filled.Delete, contentDescription = "Delete selected", tint = palette.danger)
-        }
-    }
-
-    if (showDeleteConfirm) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text(if (selectedCount == 1) "Delete recording?" else "Delete $selectedCount recordings?") },
-            text = { Text("This can't be undone.") },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    showDeleteConfirm = false
-                    onDeleteSelected()
-                }) {
-                    Text("Delete", color = palette.danger)
-                }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun RecordingRow(
-    file: File,
-    expanded: Boolean,
-    inSelectionMode: Boolean,
-    selected: Boolean,
-    onToggleExpand: () -> Unit,
-    onToggleSelect: () -> Unit,
-    onLongPress: () -> Unit,
-    onShare: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val palette = LocalDialerPalette.current
-    val label = remember(file.name) { parseRecordingLabel(file.name) }
-    // Lifted out of InlineAudioPlayer so the row's own leading icon can
-    // reflect real playback state instead of just "is this row expanded."
-    // Previously the leading icon showed Pause the instant a row expanded -
-    // regardless of whether audio had actually started - because it was
-    // driven by `expanded`, a completely different piece of state than
-    // InlineAudioPlayer's internal `isPlaying` (which starts false and only
-    // flips true once MediaPlayer's prepareAsync() finishes). That's why
-    // both icons could show "Pause" simultaneously right after tapping play:
-    // the row said "expanded = true" instantly, while actual playback was
-    // still a beat behind.
-    var isPlaying by remember(file) { mutableStateOf(false) }
-
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = { if (inSelectionMode) onToggleSelect() else onToggleExpand() },
-                    onLongClick = onLongPress
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // In selection mode, every row's leading icon becomes a
-            // selection checkmark instead of its own play button - tapping
-            // anywhere on the row toggles selection rather than starting
-            // playback, so the play affordance would be misleading here.
-            if (inSelectionMode) {
-                IconButton(onClick = onToggleSelect, modifier = Modifier.size(38.dp)) {
-                    Icon(
-                        if (selected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                        contentDescription = if (selected) "Selected" else "Not selected",
-                        tint = if (selected) palette.accent else palette.textSecondary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            } else {
-                IconButton(
-                    onClick = onToggleExpand,
-                    modifier = Modifier.size(38.dp).clip(CircleShape).background(palette.accentSoft)
-                ) {
-                    Icon(
-                        if (expanded && isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (expanded && isPlaying) "Pause" else "Play",
-                        tint = palette.accent,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(label.first, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1)
-                Text(label.second, fontSize = 12.5.sp, color = palette.textSecondary)
-            }
-            if (!inSelectionMode) {
-                IconButton(onClick = onShare) {
-                    Icon(Icons.Filled.Share, contentDescription = "Share", tint = palette.textSecondary, modifier = Modifier.size(19.dp))
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = palette.danger, modifier = Modifier.size(19.dp))
-                }
-            }
-        }
-
-        AnimatedVisibility(visible = expanded && !inSelectionMode, enter = expandVertically(), exit = shrinkVertically()) {
-            InlineAudioPlayer(
-                file = file,
-                palette = palette,
-                isPlaying = isPlaying,
-                onIsPlayingChange = { isPlaying = it }
-            )
-        }
-    }
-}
+// v4: the Recordings screen itself now lives in RecordingsHub.kt (same name, same parameters plus a few
+// new optional ones). What stays here is the reusable inline player used by Private Space, and the
+// helpers (label parsing, source detection, MediaStore lookup) shared by both screens.
 
 /**
  * A real, self-contained in-app player for a single recording - play/pause,
@@ -587,7 +283,7 @@ internal fun InlineAudioPlayer(
     }
 }
 
-private fun resolveRecordingUri(context: Context, file: File): Uri? {
+internal fun resolveRecordingUri(context: Context, file: File): Uri? {
     return try {
         val collection = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -629,7 +325,7 @@ private fun formatMs(ms: Int): String {
 }
 
 
-private fun parseRecordingLabel(fileName: String): Pair<String, String> {
+internal fun parseRecordingLabel(fileName: String): Pair<String, String> {
     val withoutExt = fileName.substringBeforeLast(".")
     val parts = withoutExt.split("_").toMutableList()
 
@@ -653,7 +349,7 @@ private fun parseRecordingLabel(fileName: String): Pair<String, String> {
 }
 
 /** The pages of the Recordings list: everything, phone calls, and one page per supported calling app. */
-private enum class RecordingKind(val title: String) {
+internal enum class RecordingKind(val title: String) {
     ALL("All"), PHONE("Phone"), WHATSAPP("WhatsApp"), TELEGRAM("Telegram"), INSTAGRAM("Instagram"), SNAPCHAT("Snapchat")
 }
 
@@ -665,7 +361,7 @@ private enum class RecordingKind(val title: String) {
  * app's name no longer appears in the file name. The file name is the fallback, which is what
  * recordings made by older versions (saved directly in "Ashu Dialer/") rely on.
  */
-private fun kindOf(file: File): RecordingKind {
+internal fun kindOf(file: File): RecordingKind {
     val folder = file.parentFile?.name?.lowercase().orEmpty()
     val n = file.name.lowercase()
     return when {

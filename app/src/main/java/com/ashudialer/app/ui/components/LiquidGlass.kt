@@ -13,42 +13,41 @@ package com.ashudialer.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerBasedShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.ashudialer.app.ui.theme.AshuStyle
 import com.ashudialer.app.ui.theme.DialerPalette
+import com.ashudialer.app.ui.theme.LocalAshuStyle
 import com.ashudialer.app.ui.theme.LocalButtonDepth
 
 /**
- * The one glass-morphism modifier for the whole app. Every screen, card,
- * sheet, and chip should use this (or the two convenience wrappers below)
- * instead of a plain `.background(palette.cardBackground, shape)` - that's
- * how "glass everywhere" actually gets applied consistently instead of
- * living in one isolated file that only BottomNav used to reach for.
+ * The one glass modifier for the whole app. Every card, sheet, chip and key goes through here, so a
+ * change in this file (or a slider in Personalize) restyles every screen at once.
  *
- * Three stacked layers make the glass read as glass rather than just a
- * translucent card:
- *  1. A semi-transparent tint of the palette's own card color, so the
- *     effect still matches whichever theme (Ocean, Midnight, Violet, etc.)
- *     is active rather than looking like a generic frosted-white pane.
- *  2. A soft diagonal highlight brush, brighter in the top-left, mimicking
- *     light catching the top edge of real glass.
- *  3. A thin light-colored border, since real glass panels are defined by
- *     their edge as much as their fill.
- *
- * tintAlpha controls how frosted (opaque) vs. how clear (see-through) the
- * panel is. 0.55 (down from an earlier 0.78) is deliberately closer to
- * actual glass - 0.78 read as a solid, barely-translucent card once seen
- * on a real device rather than glass, and the highlight/border alphas on
- * dark palettes (this app's most common case - Ocean and most other
- * built-in themes are dark) were tuned too low as well, which is why the
- * effect looked faint even where it was technically applied everywhere.
+ * v4 changes (all driven by [AshuStyle], defaults reproduce the v3 look):
+ *  - Glass intensity: how frosted / opaque the panes are.
+ *  - Corner scale: every rounded corner grows or shrinks together (circles stay circles).
+ *  - Specular edge: a bright top-left rim that fades toward the bottom-right, like light catching
+ *    real glass, plus a hairline outer edge so a pane never melts into the background.
+ *  - Real Liquid Glass panes for palettes with `glass = true`: a milky white pane (not a tinted card
+ *    colour) so the moving aurora light behind it shows through.
  */
 @Composable
 fun Modifier.liquidGlass(
@@ -57,32 +56,20 @@ fun Modifier.liquidGlass(
     tintAlpha: Float = 0.55f,
     borderAlpha: Float = 1f
 ): Modifier {
-    // Pure Black skips the whole glass look - see DialerPalette.flatSurfaces'
-    // doc comment for why. Still respects buttonDepth's raised/flat choice
-    // (a shadow + a firmer border on "raised" is orthogonal to whether the
-    // fill itself is glassy or flat), just without any of the
-    // translucent-tint/highlight-brush layers underneath it.
+    val style = LocalAshuStyle.current
+    val shp = rememberScaledShape(shape, style.cornerScale)
+
+    // Pure Black skips the whole glass look - see DialerPalette.flatSurfaces' doc comment. Still
+    // respects buttonDepth's raised/flat choice, just without any translucent layers.
     if (palette.flatSurfaces) {
         val isRaisedFlat = LocalButtonDepth.current == "raised"
-        // Unlike the glass path below (which blends its border down from
-        // Color.White/Black since it's meant to read as translucent glass
-        // catching light), a flat surface's border is just the palette's
-        // own cardBorder at full strength - that value is already tuned
-        // per-palette to be clearly visible against that palette's own
-        // cardBackground (Pure Black's #454545 on #000000, Professional's
-        // #D4D7DC on #FFFFFF). Alpha-blending it down further reintroduces
-        // exactly the "too faint to see" problem DarkModePalette's
-        // cardBorder fix (see its doc comment) already fixed once - it's
-        // only more visible here at borderAlpha's default of 1f, kept as a
-        // multiplier so a caller that explicitly wants a softer border
-        // (borderAlpha < 1) still gets one.
         val flatBorder = palette.cardBorder.copy(alpha = (if (isRaisedFlat) 1f else 0.85f) * borderAlpha)
         return this
             .let { m ->
                 if (isRaisedFlat) {
                     m.shadow(
                         elevation = 4.dp,
-                        shape = shape,
+                        shape = shp,
                         ambientColor = Color.Black.copy(alpha = 0.6f),
                         spotColor = Color.Black.copy(alpha = 0.6f)
                     )
@@ -90,48 +77,54 @@ fun Modifier.liquidGlass(
                     m
                 }
             }
-            .clip(shape)
-            .background(palette.cardBackground, shape)
-            .border(1.dp, flatBorder, shape)
+            .clip(shp)
+            .background(palette.cardBackground, shp)
+            .border(1.dp, flatBorder, shp)
     }
 
-    val glassTint = palette.cardBackground.copy(alpha = tintAlpha)
+    if (palette.glass) {
+        return this.glassPane(palette, shp, style, tintAlpha, borderAlpha)
+    }
+
+    // ---- Classic glass (every non-"glass" palette) -------------------------------------------
+    val intensity = style.glassIntensity.coerceIn(0f, 1f)
+    // 0.6 (the default) gives ~1.0 so the v3 look is unchanged; 0 = clear, 1 = nearly opaque.
+    val tintFactor = 0.45f + 0.9f * intensity
+    val shine = if (style.specular) 0.5f + 0.8f * intensity else 0f
+    val glassTint = palette.cardBackground.copy(alpha = (tintAlpha * tintFactor).coerceIn(0.08f, 0.98f))
     val highlightBrush = Brush.linearGradient(
         colors = listOf(
-            Color.White.copy(alpha = if (palette.isDark) 0.22f else 0.45f),
-            Color.White.copy(alpha = if (palette.isDark) 0.07f else 0.08f),
+            Color.White.copy(alpha = ((if (palette.isDark) 0.22f else 0.45f) * shine).coerceIn(0f, 1f)),
+            Color.White.copy(alpha = ((if (palette.isDark) 0.07f else 0.08f) * shine).coerceIn(0f, 1f)),
             Color.White.copy(alpha = 0f)
         )
     )
-    // On light palettes whose card color is itself very close to white
-    // (White theme's #FFFFFF cardBackground being the extreme case), a
-    // white highlight brush on top of an already-white tint adds nothing
-    // visible - the border ends up doing all the work of separating the
-    // glass panel from its background. Darkening the border in that
-    // specific case (near-white card color, non-dark palette) keeps every
-    // other palette's border exactly as before while giving White theme's
-    // cards/chips a visible edge instead of an near-invisible white-on-white
-    // seam.
+    // On near-white cards a white highlight adds nothing; the border does all the work.
     val cardIsNearWhite = !palette.isDark &&
         palette.cardBackground.red > 0.92f &&
         palette.cardBackground.green > 0.92f &&
         palette.cardBackground.blue > 0.92f
-    // "raised" button depth (see AppSettings.buttonDepth / LocalButtonDepth) -
-    // previously button "depth" had no setting at all, every glass surface
-    // was always exactly this flat look. When raised, the border gets a
-    // touch more opaque (reads as a firmer, more defined edge - a real
-    // Modifier.shadow() on top of an already-translucent glass background
-    // just muddies the tint rather than reading as elevation, so the edge
-    // is what actually carries a "more solid/pressable" feel here) and a
-    // dark offset-shadow layer is drawn underneath before the glass layers
-    // themselves, giving a subtle drop-shadow read without touching the
-    // translucency of the glass fill itself.
     val isRaised = LocalButtonDepth.current == "raised"
     val baseStrokeAlpha = if (palette.isDark) 0.26f else 0.65f
-    val strokeColor = if (cardIsNearWhite) {
-        Color.Black.copy(alpha = (if (isRaised) 0.16f else 0.10f) * borderAlpha)
+    val edgeBoost = if (style.specular) 1f else 0.55f
+
+    val strokeBrush: Brush = if (cardIsNearWhite) {
+        val c = Color.Black.copy(alpha = (if (isRaised) 0.16f else 0.10f) * borderAlpha)
+        Brush.linearGradient(listOf(c, c))
     } else {
-        Color.White.copy(alpha = (baseStrokeAlpha + if (isRaised) 0.12f else 0f) * borderAlpha)
+        val a = ((baseStrokeAlpha + if (isRaised) 0.12f else 0f) * borderAlpha * edgeBoost).coerceIn(0f, 1f)
+        if (style.specular) {
+            // bright where light hits (top-left), softer toward the bottom-right
+            Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = (a * 1.35f).coerceAtMost(1f)),
+                    Color.White.copy(alpha = a * 0.45f),
+                    Color.White.copy(alpha = a * 0.8f)
+                )
+            )
+        } else {
+            Brush.linearGradient(listOf(Color.White.copy(alpha = a), Color.White.copy(alpha = a)))
+        }
     }
 
     return this
@@ -139,7 +132,7 @@ fun Modifier.liquidGlass(
             if (isRaised) {
                 m.shadow(
                     elevation = 4.dp,
-                    shape = shape,
+                    shape = shp,
                     ambientColor = Color.Black.copy(alpha = if (palette.isDark) 0.5f else 0.22f),
                     spotColor = Color.Black.copy(alpha = if (palette.isDark) 0.5f else 0.22f)
                 )
@@ -147,17 +140,107 @@ fun Modifier.liquidGlass(
                 m
             }
         }
-        .clip(shape)
-        .background(glassTint, shape)
-        .background(highlightBrush, shape)
-        .border(1.dp, strokeColor, shape)
+        .clip(shp)
+        .background(glassTint, shp)
+        .background(highlightBrush, shp)
+        .border(1.dp, strokeBrush, shp)
 }
+
+/**
+ * The real "Liquid Glass" pane (palettes with glass = true).
+ *
+ * Layers, bottom to top:
+ *  1. a vertical milky-white wash - lighter at the top, thinner at the bottom, like a lens catching light;
+ *  2. a diagonal sheen that picks up a trace of the accent colour;
+ *  3. a bright specular rim (1dp) that fades from top-left to bottom-right;
+ *  4. a 0.5dp darker hairline on the very outside, so the pane keeps a crisp edge on any background.
+ */
+private fun Modifier.glassPane(
+    palette: DialerPalette,
+    shape: Shape,
+    style: AshuStyle,
+    tintAlpha: Float,
+    borderAlpha: Float
+): Modifier {
+    val k = style.glassIntensity.coerceIn(0f, 1f)
+    val dark = palette.isDark
+    // Callers that ask for a heavier pane (BottomNav passes 0.9) get a proportionally milkier one.
+    val boost = (tintAlpha / 0.55f).coerceIn(0.7f, 1.7f)
+
+    val topA = (if (dark) 0.075f + 0.14f * k else 0.46f + 0.36f * k) * boost
+    val bottomA = (if (dark) 0.035f + 0.075f * k else 0.32f + 0.30f * k) * boost
+    val fill = Brush.verticalGradient(
+        listOf(
+            Color.White.copy(alpha = topA.coerceIn(0f, 0.96f)),
+            Color.White.copy(alpha = bottomA.coerceIn(0f, 0.92f))
+        )
+    )
+    val sheen = Brush.linearGradient(
+        listOf(
+            Color.White.copy(alpha = if (dark) 0.16f else 0.35f),
+            Color.Transparent,
+            palette.accent.copy(alpha = if (dark) 0.07f else 0.05f)
+        )
+    )
+    val rimBright = if (style.specular) (if (dark) 0.62f else 0.95f) else (if (dark) 0.22f else 0.60f)
+    val rim = Brush.linearGradient(
+        listOf(
+            Color.White.copy(alpha = (rimBright * borderAlpha).coerceIn(0f, 1f)),
+            Color.White.copy(alpha = (rimBright * 0.16f * borderAlpha).coerceIn(0f, 1f)),
+            Color.White.copy(alpha = (rimBright * 0.42f * borderAlpha).coerceIn(0f, 1f))
+        )
+    )
+    val hairline = if (dark) Color.Black.copy(alpha = 0.22f) else Color(0xFF0F1B3A).copy(alpha = 0.10f)
+
+    return this
+        .clip(shape)
+        .background(fill, shape)
+        .background(sheen, shape)
+        .border(1.dp, rim, shape)
+        .border(0.5.dp, hairline, shape)
+}
+
+/** Scales every rounded corner of [base] by [k]; each corner is capped at half the shortest side. */
+private class ScaledCornerShape(
+    private val base: CornerBasedShape,
+    private val k: Float
+) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val maxRadius = minOf(size.width, size.height) / 2f
+        fun radius(c: CornerSize): Float = (c.toPx(size, density) * k).coerceIn(0f, maxRadius)
+        val topStart = radius(base.topStart)
+        val topEnd = radius(base.topEnd)
+        val bottomEnd = radius(base.bottomEnd)
+        val bottomStart = radius(base.bottomStart)
+        val ltr = layoutDirection == LayoutDirection.Ltr
+        return Outline.Rounded(
+            RoundRect(
+                left = 0f,
+                top = 0f,
+                right = size.width,
+                bottom = size.height,
+                topLeftCornerRadius = CornerRadius(if (ltr) topStart else topEnd),
+                topRightCornerRadius = CornerRadius(if (ltr) topEnd else topStart),
+                bottomRightCornerRadius = CornerRadius(if (ltr) bottomEnd else bottomStart),
+                bottomLeftCornerRadius = CornerRadius(if (ltr) bottomStart else bottomEnd)
+            )
+        )
+    }
+}
+
+@Composable
+private fun rememberScaledShape(shape: Shape, k: Float): Shape =
+    remember(shape, k) {
+        // Circles (avatars, round buttons) and anything that is not a rounded-corner shape stay as is.
+        if (k == 1f || shape !is CornerBasedShape || shape == CircleShape) shape
+        else ScaledCornerShape(shape, k)
+    }
 
 /** Rounded-rect glass panel - the default for cards, rows, sheets, and settings items. */
 @Composable
 fun Modifier.glassCard(
     palette: DialerPalette,
-    corner: androidx.compose.ui.unit.Dp = 18.dp,
+    corner: Dp = 18.dp,
     tintAlpha: Float = 0.55f
 ): Modifier = this.liquidGlass(palette, RoundedCornerShape(corner), tintAlpha)
 

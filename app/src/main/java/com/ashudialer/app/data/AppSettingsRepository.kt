@@ -125,8 +125,68 @@ data class AppSettings(
     // adds a subtle drop shadow + slightly stronger border for a more
     // tactile, pressable look for anyone who wants buttons to look more
     // like physical buttons and less like flat labels.
-    val buttonDepth: String = "flat"
+    val buttonDepth: String = "flat",
+
+    // ---------------- v4 Personalize (see ui/theme/AshuStyle.kt and PersonalizeScreen.kt) ----------
+    val glassIntensityPct: Int = 60,
+    val cornerScalePct: Int = 100,
+    val motionScalePct: Int = 100,
+    val hapticLevel: Int = 2,
+    /** ARGB of the custom accent colour, 0 = use the theme's own accent. */
+    val accentOverrideArgb: Long = 0L,
+    val navStyle: String = "floating",
+    val navLabels: String = "always",
+    val avatarShape: String = "circle",
+    val listDensity: String = "comfortable",
+    val auroraEnabled: Boolean = true,
+    val specularEnabled: Boolean = true,
+    val keypadStyle: String = "glass",
+    val swipeActionsEnabled: Boolean = true,
+    val staggerLists: Boolean = true,
+
+    // ---------------- v4 Recordings screen preferences (UI only - the recorder keeps its own prefs) ---
+    val recordingsGroupByContact: Boolean = false,
+    val recordingsSort: String = "newest"
 )
+
+/** Keys of the generic Personalize / Recordings-UI preferences (stored as "p_<name>"). */
+object PKey {
+    const val GLASS = "glass"
+    const val CORNER = "corner"
+    const val MOTION = "motion"
+    const val HAPTIC = "haptic"
+    const val ACCENT = "accent"
+    const val NAV_STYLE = "nav_style"
+    const val NAV_LABELS = "nav_labels"
+    const val AVATAR = "avatar"
+    const val DENSITY = "density"
+    const val AURORA = "aurora"
+    const val SPECULAR = "specular"
+    const val KEYPAD = "keypad"
+    const val SWIPE = "swipe"
+    const val STAGGER = "stagger"
+    const val REC_GROUP = "rec_group_by_contact"
+    const val REC_SORT = "rec_sort"
+}
+
+/** Everything the person tuned in Personalize, as one object every screen can read via LocalAshuStyle. */
+fun AppSettings.toAshuStyle(): com.ashudialer.app.ui.theme.AshuStyle =
+    com.ashudialer.app.ui.theme.AshuStyle(
+        glassIntensity = glassIntensityPct.coerceIn(0, 100) / 100f,
+        cornerScale = cornerScalePct.coerceIn(40, 180) / 100f,
+        motionScale = motionScalePct.coerceIn(0, 200) / 100f,
+        hapticLevel = hapticLevel.coerceIn(0, 3),
+        accentOverride = if (accentOverrideArgb != 0L) androidx.compose.ui.graphics.Color(accentOverrideArgb.toInt()) else null,
+        navStyle = navStyle,
+        navLabels = navLabels,
+        avatarShape = avatarShape,
+        density = listDensity,
+        aurora = auroraEnabled,
+        specular = specularEnabled,
+        keypadStyle = keypadStyle,
+        swipeActions = swipeActionsEnabled,
+        staggerLists = staggerLists
+    )
 
 class AppSettingsRepository(private val context: Context) {
 
@@ -216,7 +276,52 @@ class AppSettingsRepository(private val context: Context) {
             defaultSimAccountId = prefs[keyDefaultSimAccountId] ?: "",
             confirmSimBeforeCall = prefs[keyConfirmSimBeforeCall] ?: true,
             buttonDepth = prefs[keyButtonDepth] ?: "flat",
+            glassIntensityPct = prefs[pInt(PKey.GLASS)] ?: 60,
+            cornerScalePct = prefs[pInt(PKey.CORNER)] ?: 100,
+            motionScalePct = prefs[pInt(PKey.MOTION)] ?: 100,
+            hapticLevel = prefs[pInt(PKey.HAPTIC)] ?: 2,
+            accentOverrideArgb = prefs[pLong(PKey.ACCENT)] ?: 0L,
+            navStyle = prefs[pStr(PKey.NAV_STYLE)] ?: "floating",
+            navLabels = prefs[pStr(PKey.NAV_LABELS)] ?: "always",
+            avatarShape = prefs[pStr(PKey.AVATAR)] ?: "circle",
+            listDensity = prefs[pStr(PKey.DENSITY)] ?: "comfortable",
+            auroraEnabled = prefs[pBool(PKey.AURORA)] ?: true,
+            specularEnabled = prefs[pBool(PKey.SPECULAR)] ?: true,
+            keypadStyle = prefs[pStr(PKey.KEYPAD)] ?: "glass",
+            swipeActionsEnabled = prefs[pBool(PKey.SWIPE)] ?: true,
+            staggerLists = prefs[pBool(PKey.STAGGER)] ?: true,
+            recordingsGroupByContact = prefs[pBool(PKey.REC_GROUP)] ?: false,
+            recordingsSort = prefs[pStr(PKey.REC_SORT)] ?: "newest",
         )
+    }
+
+    private fun pInt(name: String) = androidx.datastore.preferences.core.intPreferencesKey("p_$name")
+    private fun pLong(name: String) = androidx.datastore.preferences.core.longPreferencesKey("p_$name")
+    private fun pStr(name: String) = stringPreferencesKey("p_$name")
+    private fun pBool(name: String) = booleanPreferencesKey("p_$name")
+
+    suspend fun setPersonalizeInt(name: String, value: Int) {
+        context.settingsDataStore.edit { it[pInt(name)] = value }
+    }
+
+    suspend fun setPersonalizeLong(name: String, value: Long) {
+        context.settingsDataStore.edit { it[pLong(name)] = value }
+    }
+
+    suspend fun setPersonalizeString(name: String, value: String) {
+        context.settingsDataStore.edit { it[pStr(name)] = value }
+    }
+
+    suspend fun setPersonalizeBool(name: String, value: Boolean) {
+        context.settingsDataStore.edit { it[pBool(name)] = value }
+    }
+
+    /** Puts every Personalize control back to its default (the theme itself is not touched). */
+    suspend fun resetPersonalization() {
+        context.settingsDataStore.edit { prefs ->
+            val mine = prefs.asMap().keys.filter { it.name.startsWith("p_") && !it.name.startsWith("p_rec_") }
+            mine.forEach { prefs.remove(it) }
+        }
     }
 
     // The recorder itself (phone-state receiver + foreground service in :appcalls) reads its

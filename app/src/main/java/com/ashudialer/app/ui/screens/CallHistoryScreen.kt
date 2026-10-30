@@ -47,7 +47,7 @@ fun CallHistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val palette = LocalDialerPalette.current
-    Column(modifier = modifier.fillMaxSize().background(palette.background)) {
+    Column(modifier = modifier.fillMaxSize().background(palette.opaqueBackground)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically

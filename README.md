@@ -49,10 +49,55 @@ Debug and local builds skip the check. This raises the bar, it cannot make modif
 secret and share only the Releases page. Auto Backup is off, Private Space blocks screenshots, and debug/verbose logging
 is stripped from release builds.
 
+## What's new in 2.0.0
+
+- **Simple by default**: plain White and plain Black ("Auto" follows your phone). Liquid Glass, Frost
+  Glass, Obsidian Gold, Emerald Night and the older colour themes are optional extras.
+- **Personalize** (More > Personalize): accent colour, glass frosting, corner roundness, avatar shape,
+  list spacing, text size, animation speed, haptic strength, bottom bar and dial pad style, with a live
+  preview. One Reset button puts it all back.
+- **Recordings hub**: waveform player with speed control, bookmarks ("mark a moment" during the call),
+  stars, tags, notes, search, filters, sorting, group by person and storage tools.
+- **Optional Google Drive backup** (no login) and a **cloud-only** mode. See below.
+- Redesigned onboarding and More screen, swipe actions on recent calls.
+- Fixed a crash when searching some number combinations in Recents, and the call notification timer that
+  started before the other person answered.
+
+Everything new that touches recording is optional and off unless you turn it on; the existing recorder
+works exactly as before. Details: [CHANGELOG.md](CHANGELOG.md) and [docs/V2_PLAN_AND_STATUS.md](docs/V2_PLAN_AND_STATUS.md).
+
+## Optional: back up recordings to Google Drive
+
+No Google login and no developer-console setup. Ashu Phone copies each finished recording into a folder
+you choose, and the Drive app uploads it.
+
+1. Open **Recordings > Settings (gear)** and switch on **Back up to Google Drive**.
+2. In the picker that opens, tap the menu (three lines) > **Drive**, open or create a folder, then
+   **Use this folder**.
+3. Choose **Wi-Fi only**, **Only while charging** and **Back up automatically** as you like.
+4. Optional **Keep recordings only in the cloud**: after a successful upload the copy on the phone is
+   deleted. Until then the file waits in private app storage (never in your Music folder). If an upload
+   can't finish, the recording stays on the phone and you get a notification.
+
+Any app that offers a folder in Android's picker (OneDrive, Dropbox, Nextcloud...) works the same way.
+
 ## Credits
 
-Call-recording engine adapted from [ShizuCallRecorder](https://github.com/kitsumed/ShizuCallRecorder)
-(GPLv3+) and the Ever Dialer recorder module. scrcpy-server by Genymobile (Apache-2.0).
+Ashu Phone stands on open-source work. Thank you to:
+
+- **[ShizuCallRecorder](https://github.com/kitsumed/ShizuCallRecorder)** by kitsumed (GPL-3.0-or-later):
+  the call-recording engine is adapted from it. Ashu Phone's recorder is a modified fork derived from it.
+- **[Ever Dialer](https://github.com/hari161008/Ever-Dialer)** by hari161008 (GPL-3.0): recorder module
+  groundwork, and ideas for recorder settings, haptic strength, bottom-bar customisation and glass looks.
+- **[CallVault](https://github.com/madkongo/CallVault)** by madkongo (GPL-3.0 with additional terms):
+  ideas only - Drive backup through the system file picker, marking moments, stars, tags and notes.
+- **[JemRec](https://github.com/jemcik/JemRec)** by Yevhen Yemchynskyi (Apache-2.0): ideas only - marking
+  moments, discarding very short recordings, recorder health checks.
+- **[scrcpy](https://github.com/Genymobile/scrcpy)** by Genymobile (Apache-2.0): the bundled, unmodified
+  scrcpy-server used for app-call recording.
+- **[Shizuku](https://github.com/RikkaApps/Shizuku)** and Shizuku-API by RikkaApps (Apache-2.0).
+
+The same credits are on the in-app About screen and in [NOTICE](NOTICE).
 
 ## Notification/UI polish
 

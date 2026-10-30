@@ -642,7 +642,9 @@ private fun MatchedContactsList(
     // matching numbers (Mobile + Work) still shows as two independently
     // tappable rows, same as the earlier grouped-card version.
     val rows = remember(matchedByContactId) {
+        // v4: distinctBy keeps the LazyColumn keys unique even if the same number is listed twice.
         matchedByContactId.flatMap { (_, numbers) -> numbers }
+            .distinctBy { it.contactId + "|" + it.phoneNumber }
     }
 
     // Width now fills the available space (the parent Column already caps
@@ -861,6 +863,8 @@ private fun DialerKey(
         label = "dial-key-glow"
     )
     val fire = onPress
+    // v4 Personalize > Dial pad keys: glass (default), flat or outline.
+    val keypadStyle = com.ashudialer.app.ui.theme.LocalAshuStyle.current.keypadStyle
 
     Box(
         modifier = modifier
@@ -882,7 +886,15 @@ private fun DialerKey(
                 .size(size)
                 // State is read inside these lambdas, so a press redraws the key instead of recomposing the screen.
                 .graphicsLayer { scaleX = scale; scaleY = scale }
-                .glassCircle(palette)
+                .let { m ->
+                    when (keypadStyle) {
+                        com.ashudialer.app.ui.theme.AshuStyle.KEYPAD_FLAT ->
+                            m.clip(CircleShape).background(palette.accentSoft.copy(alpha = if (palette.isDark) 0.7f else 1f), CircleShape)
+                        com.ashudialer.app.ui.theme.AshuStyle.KEYPAD_OUTLINE ->
+                            m.clip(CircleShape).border(1.5.dp, palette.textSecondary.copy(alpha = 0.55f), CircleShape)
+                        else -> m.glassCircle(palette)
+                    }
+                }
                 .drawWithContent {
                     // Soft accent glow that lights up on touch-down and fades out on release.
                     drawCircle(color = palette.accent.copy(alpha = 0.20f * glow))

@@ -71,10 +71,17 @@ fun vibrateForButtonPress(context: Context, enabled: Boolean) {
 fun rememberButtonHaptic(enabled: Boolean): () -> Unit {
     val context = LocalContext.current
     val view = LocalView.current
-    return remember(context, view, enabled) {
+    // v4 Personalize > Haptic strength: 0 off, 1 light tick, 2 normal (the v3 behaviour), 3 strong.
+    val level = com.ashudialer.app.ui.theme.LocalAshuStyle.current.hapticLevel
+    return remember(context, view, enabled, level) {
         {
-            if (enabled) {
-                val performed = view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+            if (enabled && level > 0) {
+                val constant = when (level) {
+                    1 -> HapticFeedbackConstants.CLOCK_TICK
+                    3 -> HapticFeedbackConstants.LONG_PRESS
+                    else -> HapticFeedbackConstants.VIRTUAL_KEY
+                }
+                val performed = view.performHapticFeedback(constant)
                 if (!performed) vibrateForButtonPress(context, true)
             }
         }

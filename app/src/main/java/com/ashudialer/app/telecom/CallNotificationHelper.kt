@@ -34,6 +34,13 @@ object CallNotificationHelper {
 
     private var ongoingCallStartMillis: Long = 0L
 
+    // v4 FIX ("seconds start running before I even pick up"): the ongoing-call notification used to
+    // start its chronometer the moment an OUTGOING call began dialing, so the timer ran while the
+    // other phone was still ringing. The timer now starts only once the call is really connected
+    // (Call.STATE_ACTIVE). These two remember the state so refreshOngoing() re-posts the same look.
+    private var lastCallConnected: Boolean = false
+    private var lastCallOnHold: Boolean = false
+
     /**
      * Whether the calling notification should use its light or dark
      * background/text - previously this notification used one hardcoded
@@ -318,18 +325,44 @@ object CallNotificationHelper {
 
     var isCallScreenVisible: Boolean = false
 
-    fun showOngoingCallNotification(context: Context, callerName: String) {
+    /**
+     * @param connected false while an outgoing call is still dialing / ringing at the other end: the
+     *  notification then says "Calling..." and shows NO running timer. true once the call is answered.
+     * @param connectTimeMillis Call.Details.connectTimeMillis (0 = unknown, now is used instead).
+     * @param onHold the call is on hold: the label changes and the live timer is hidden (the call's
+     *  start time is kept, so the timer carries on from the right value after resuming).
+     */
+    fun showOngoingCallNotification(
+        context: Context,
+        callerName: String,
+        connected: Boolean = true,
+        connectTimeMillis: Long = 0L,
+        onHold: Boolean = false
+    ) {
         try {
             stopAvatarPulse()
             lastCallerName = callerName
             lastIsIncoming = false
+            lastCallConnected = connected
+            lastCallOnHold = onHold
 
-            if (ongoingCallStartMillis == 0L) {
-                ongoingCallStartMillis = System.currentTimeMillis()
+            if (connected) {
+                if (ongoingCallStartMillis == 0L) {
+                    ongoingCallStartMillis =
+                        if (connectTimeMillis > 0L) connectTimeMillis else System.currentTimeMillis()
+                }
+            } else {
+                // Not answered yet: no start time, so nothing can tick.
+                ongoingCallStartMillis = 0L
+            }
+            val statusLabel = when {
+                !connected -> "Calling\u2026"
+                onHold -> "On hold"
+                else -> "Ongoing call"
             }
 
-            val views = buildGlassLayout(context, callerName, statusText = "Ongoing call", incoming = false)
-            val compactViews = buildCompactOngoingLayout(context, callerName)
+            val views = buildGlassLayout(context, callerName, statusText = statusLabel, incoming = false)
+            val compactViews = buildCompactOngoingLayout(context, callerName, statusLabel)
 
             // Bug fix: this was missing FLAG_ACTIVITY_SINGLE_TOP and
             // FLAG_ACTIVITY_NO_USER_ACTION, unlike the matching intent for
@@ -367,8 +400,12 @@ object CallNotificationHelper {
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
-                .setWhen(ongoingCallStartMillis)
-                .setUsesChronometer(true)
+
+            if (connected && !onHold && ongoingCallStartMillis > 0L) {
+                builder.setWhen(ongoingCallStartMillis).setUsesChronometer(true).setShowWhen(true)
+            } else {
+                builder.setUsesChronometer(false).setShowWhen(false)
+            }
 
             val isXiaomiFamily = Build.MANUFACTURER.equals("xiaomi", true) ||
                 Build.MANUFACTURER.equals("redmi", true) ||
@@ -381,7 +418,7 @@ object CallNotificationHelper {
                     .setCustomBigContentView(views)
                     .setCustomHeadsUpContentView(views)
                     .setContentTitle(callerName)
-                    .setContentText("Ongoing call")
+                    .setContentText(statusLabel)
                     .build()
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val caller = androidx.core.app.Person.Builder()
@@ -401,7 +438,7 @@ object CallNotificationHelper {
                     .addAction(speakerAction)
                     .addAction(muteAction)
                     .setContentTitle(callerName)
-                    .setContentText("Ongoing call")
+                    .setContentText(statusLabel)
                     .build()
             } else {
                 builder
@@ -410,7 +447,7 @@ object CallNotificationHelper {
                     .setCustomBigContentView(views)
                     .setCustomHeadsUpContentView(views)
                     .setContentTitle(callerName)
-                    .setContentText("Ongoing call")
+                    .setContentText(statusLabel)
                     .build()
             }
 
@@ -423,7 +460,12 @@ object CallNotificationHelper {
 
     fun refreshOngoing(context: Context) {
         if (lastIsIncoming || lastCallerName.isBlank()) return
-        showOngoingCallNotification(context, lastCallerName)
+        showOngoingCallNotification(
+            context, lastCallerName,
+            connected = lastCallConnected,
+            connectTimeMillis = ongoingCallStartMillis,
+            onHold = lastCallOnHold
+        )
     }
 
     fun clear(context: Context) {
@@ -444,6 +486,8 @@ object CallNotificationHelper {
         manager.cancel(NOTIFICATION_ID)
         lastCallerName = ""
         lastIsIncoming = false
+        lastCallConnected = false
+        lastCallOnHold = false
         ongoingCallStartMillis = 0L
     }
 
@@ -491,14 +535,14 @@ object CallNotificationHelper {
         }
     }
 
-    private fun buildCompactOngoingLayout(context: Context, callerName: String): RemoteViews {
+    private fun buildCompactOngoingLayout(context: Context, callerName: String, statusLabel: String = "Ongoing call"): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.notification_call_compact)
         val style = notificationThemeStyle(context)
         views.setInt(R.id.compact_root, "setBackgroundResource", style.backgroundRes)
         views.setTextColor(R.id.compact_name, style.primaryText)
         views.setTextColor(R.id.compact_status, style.secondaryText)
         views.setTextViewText(R.id.compact_name, callerName)
-        views.setTextViewText(R.id.compact_status, "Ongoing call")
+        views.setTextViewText(R.id.compact_status, statusLabel)
         views.setOnClickPendingIntent(R.id.compact_speaker, CallActionReceiver.toggleSpeakerIntent(context))
         views.setOnClickPendingIntent(R.id.compact_mute, CallActionReceiver.toggleMuteIntent(context))
         views.setOnClickPendingIntent(R.id.compact_end, CallActionReceiver.endIntent(context))

@@ -51,6 +51,7 @@ import com.ashudialer.app.ui.screens.CallScreen
 import com.ashudialer.app.ui.screens.IncomingCallScreen
 import com.ashudialer.app.ui.screens.NativeVideoCallScreen
 import com.ashudialer.app.ui.theme.AshuDialerTheme
+import com.ashudialer.app.data.toAshuStyle
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -766,7 +767,7 @@ class InCallActivity : ComponentActivity() {
                 }
             }
 
-            AshuDialerTheme(themeId = themeId, fontSizeIndex = settings.fontSizeIndex, buttonDepth = settings.buttonDepth) {
+            AshuDialerTheme(themeId = themeId, fontSizeIndex = settings.fontSizeIndex, buttonDepth = settings.buttonDepth, style = settings.toAshuStyle()) {
                 // Same theme-follows-status-bar-icon-color fix as
                 // MainActivity - previously InCallActivity had no status bar
                 // styling at all (Theme.AshuDialer.Call's XML didn't set

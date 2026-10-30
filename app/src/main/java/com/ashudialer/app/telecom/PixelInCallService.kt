@@ -488,14 +488,25 @@ class PixelInCallService : InCallService() {
                 CallNotificationHelper.showIncomingCallNotification(applicationContext, name, number, latestSettings.ledFlashForAlerts)
             }
             Call.STATE_DIALING, Call.STATE_CONNECTING -> {
-
-
+                // v4: still ringing at the other end -> "Calling..." with NO running timer.
                 if (!isIncoming) {
-                    CallNotificationHelper.showOngoingCallNotification(applicationContext, name)
+                    CallNotificationHelper.showOngoingCallNotification(applicationContext, name, connected = false)
                 }
             }
-            Call.STATE_ACTIVE, Call.STATE_HOLDING -> {
-                CallNotificationHelper.showOngoingCallNotification(applicationContext, name)
+            Call.STATE_ACTIVE -> {
+                CallNotificationHelper.showOngoingCallNotification(
+                    applicationContext, name,
+                    connected = true,
+                    connectTimeMillis = call.details?.connectTimeMillis ?: 0L
+                )
+            }
+            Call.STATE_HOLDING -> {
+                CallNotificationHelper.showOngoingCallNotification(
+                    applicationContext, name,
+                    connected = true,
+                    connectTimeMillis = call.details?.connectTimeMillis ?: 0L,
+                    onHold = true
+                )
             }
             Call.STATE_DISCONNECTED -> {
                 if (_allCalls.size <= 1) {
@@ -696,7 +707,14 @@ class PixelInCallService : InCallService() {
         } catch (e: Exception) {
             Log.w(TAG, "Direct startActivity failed, falling back to call notification", e)
             try {
-                CallNotificationHelper.showOngoingCallNotification(applicationContext, name)
+                val st = call?.state ?: Call.STATE_ACTIVE
+                val answered = st == Call.STATE_ACTIVE || st == Call.STATE_HOLDING
+                CallNotificationHelper.showOngoingCallNotification(
+                    applicationContext, name,
+                    connected = answered,
+                    connectTimeMillis = call?.details?.connectTimeMillis ?: 0L,
+                    onHold = st == Call.STATE_HOLDING
+                )
             } catch (fallbackError: Exception) {
                 Log.e(TAG, "Call notification fallback also failed", fallbackError)
             }

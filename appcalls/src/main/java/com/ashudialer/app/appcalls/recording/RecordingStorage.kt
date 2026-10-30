@@ -114,7 +114,11 @@ object RecordingStorage {
             return null
         }
 
-        if (prefs.storageMode == RecordingPrefs.StorageMode.PUBLIC_MUSIC) {
+        // v4 "Cloud only": the recording never touches the public Music folder. It waits in the app's
+        // private storage until it has been uploaded; CloudCopyWorker then removes it from the phone.
+        val cloud = com.ashudialer.app.appcalls.cloud.CloudPrefs(context)
+        val keepOffPublicStorage = cloud.isActive && cloud.cloudOnly
+        if (prefs.storageMode == RecordingPrefs.StorageMode.PUBLIC_MUSIC && !keepOffPublicStorage) {
             saveToMediaStore(context, temp, codec, subFolderFor(session))?.let { return it }
             AppCallsLogger.w(TAG, "MediaStore save failed - falling back to private storage")
         }

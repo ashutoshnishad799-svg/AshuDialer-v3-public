@@ -85,7 +85,7 @@ object RecordingLibrary {
     }
 
     /** Deletes the exact MediaStore row (matched by name + folder), then the file itself. Returns true once it is gone. */
-    fun delete(context: Context, file: File): Boolean {
+    fun delete(context: Context, file: File, keepMeta: Boolean = false): Boolean {
         try {
             val resolver = context.contentResolver
             val (selection, args) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -106,6 +106,10 @@ object RecordingLibrary {
             AppCallsLogger.w(TAG, "MediaStore delete failed: ${e.message}")
         }
         if (file.exists()) runCatching { file.delete() }
-        return !file.exists()
+        val gone = !file.exists()
+        // v4: the star / tags / note / bookmarks of a deleted recording go with it (unless the file is only
+        // leaving the phone because it was backed up to the cloud - see CloudCopyWorker).
+        if (gone && !keepMeta) runCatching { RecordingMetaStore(context).remove(file.name) }
+        return gone
     }
 }

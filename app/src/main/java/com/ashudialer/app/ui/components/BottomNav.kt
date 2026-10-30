@@ -67,7 +67,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ashudialer.app.ui.theme.AshuStyle
 import com.ashudialer.app.ui.theme.DialerPalette
+import com.ashudialer.app.ui.theme.LocalAshuStyle
 import com.ashudialer.app.ui.theme.LocalDialerPalette
 
 enum class DialerTab(val label: String) {
@@ -94,8 +96,22 @@ fun DialerBottomNav(
     onSelect: (DialerTab) -> Unit
 ) {
     val palette = LocalDialerPalette.current
+    val style = LocalAshuStyle.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val hapticState = rememberUpdatedState(style.hapticLevel)
     val tabs = DialerTab.values()
     val currentOnSelect by rememberUpdatedState(onSelect)
+    // v4: a light tick every time the selected tab changes (strength follows Personalize > Haptics).
+    val fireSelect: (DialerTab) -> Unit = { tab ->
+        val level = hapticState.value
+        if (level > 0) {
+            view.performHapticFeedback(
+                if (level >= 3) android.view.HapticFeedbackConstants.LONG_PRESS
+                else android.view.HapticFeedbackConstants.CLOCK_TICK
+            )
+        }
+        currentOnSelect(tab)
+    }
 
     // Pill position in tab units (0.0 = first tab ... 4.0 = last). NaN while no finger is dragging.
     var dragPosition by remember { mutableFloatStateOf(Float.NaN) }
@@ -116,12 +132,18 @@ fun DialerBottomNav(
     }
     val position: () -> Float = { if (dragPosition.isNaN()) glide.value else dragPosition }
 
+    // v4 Personalize > Bottom bar: a floating glass pill (default) or a full-width docked bar.
+    val navDocked = style.navStyle == AshuStyle.NAV_DOCKED
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-            .liquidGlass(palette = palette, shape = RoundedCornerShape(28.dp), tintAlpha = 0.9f)
+            .then(if (navDocked) Modifier else Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+            .liquidGlass(
+                palette = palette,
+                shape = if (navDocked) RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp) else RoundedCornerShape(28.dp),
+                tintAlpha = 0.9f
+            )
             .padding(vertical = 8.dp, horizontal = 4.dp)
     ) {
         BoxWithConstraints(
@@ -143,7 +165,7 @@ fun DialerBottomNav(
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (!change.pressed) {
                                 // A plain tap (no slide): select the tab that was touched.
-                                if (!dragged) currentOnSelect(tabs[indexAt(change.position.x)])
+                                if (!dragged) fireSelect(tabs[indexAt(change.position.x)])
                                 break
                             }
                             if (!dragged && abs(change.position.x - down.position.x) > slop) {
@@ -158,7 +180,7 @@ fun DialerBottomNav(
                                 val idx = p.roundToInt().coerceIn(0, tabs.size - 1)
                                 if (idx != lastIndex) {
                                     lastIndex = idx
-                                    currentOnSelect(tabs[idx])
+                                    fireSelect(tabs[idx])
                                 }
                             }
                         }
@@ -175,7 +197,15 @@ fun DialerBottomNav(
                 Modifier
                     .width(cellW)
                     .height(NavCellHeight)
-                    .graphicsLayer { translationX = position() * cellWpx }
+                    .graphicsLayer {
+                        val pos = position()
+                        translationX = pos * cellWpx
+                        // v4 "liquid" stretch: the glass bubble elongates while it travels to a new tab
+                        // and settles back into shape as it arrives.
+                        val stretch = if (style.animationsOn) abs(pos - selected.ordinal).coerceIn(0f, 1f) else 0f
+                        scaleX = 1f + 0.24f * stretch
+                        scaleY = 1f - 0.08f * stretch
+                    }
                     .padding(horizontal = 4.dp)
                     .clip(RoundedCornerShape(18.dp))
                     .background(
@@ -194,6 +224,7 @@ fun DialerBottomNav(
                         pressed = pressedIndex == index,
                         position = position,
                         palette = palette,
+                        labels = style.navLabels,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -209,6 +240,7 @@ private fun NavTabItem(
     pressed: Boolean,
     position: () -> Float,
     palette: DialerPalette,
+    labels: String,
     modifier: Modifier
 ) {
     val pressScale by animateFloatAsState(
@@ -233,20 +265,29 @@ private fun NavTabItem(
             contentDescription = tab.label,
             tint = contentColor,
             modifier = Modifier
-                .size(22.dp)
+                .size(if (labels == AshuStyle.LABELS_NEVER) 25.dp else 22.dp)
                 .graphicsLayer {
                     val grow = 1f + 0.12f * near
                     scaleX = grow
                     scaleY = grow
                 }
         )
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = tab.label,
-            fontSize = 10.5.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-            color = contentColor
-        )
+        val showLabel = labels == AshuStyle.LABELS_ALWAYS || (labels == AshuStyle.LABELS_SELECTED && isSelected)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showLabel,
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = tab.label,
+                    fontSize = 10.5.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    color = contentColor
+                )
+            }
+        }
     }
 }
 

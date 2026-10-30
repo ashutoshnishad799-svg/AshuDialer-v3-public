@@ -11,6 +11,11 @@
 package com.ashudialer.app.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import com.ashudialer.app.ui.components.AuroraBackground
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -19,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +62,8 @@ const val AUTO_THEME_ID = "auto"
  */
 fun resolveThemeId(themeId: String, systemIsDark: Boolean): String =
     if (themeId == AUTO_THEME_ID) {
-        if (systemIsDark) "darkmode" else "professional"
+        // v4: the two simple defaults - plain White in light mode, plain Black in dark mode.
+        if (systemIsDark) "darkmode" else "white"
     } else {
         themeId
     }
@@ -84,16 +91,35 @@ private fun fontScaleFor(index: Int): Float = when (index) {
     else -> 1f   // Medium (default)
 }
 
+/**
+ * v4: a custom accent colour (Personalize > Accent). Only the accent-derived colours change; every
+ * theme keeps its own backgrounds, cards and text so contrast stays what the theme was tuned for.
+ */
+private fun DialerPalette.withAccent(accent: Color?): DialerPalette {
+    if (accent == null) return this
+    return copy(
+        accent = accent,
+        accentSoft = accent.copy(alpha = if (isDark) 0.24f else 0.16f),
+        swatchEnd = accent
+    )
+}
+
 @Composable
 fun AshuDialerTheme(
     themeId: String,
     fontSizeIndex: Int = 1,
     buttonDepth: String = "flat",
+    style: AshuStyle = AshuStyle(),
     content: @Composable () -> Unit
 ) {
     val systemIsDark = isSystemInDarkTheme()
     val resolvedId = resolveThemeId(themeId, systemIsDark)
-    val palette = paletteById(resolvedId)
+    val basePalette = paletteById(resolvedId)
+    val palette = remember(basePalette, style.accentOverride) { basePalette.withAccent(style.accentOverride) }
+    // Liquid Glass themes with the aurora switched on: the aurora is drawn once, behind EVERYTHING, and
+    // every screen gets a transparent `background` so it shows through. Off / any other theme: untouched.
+    val glassAurora = palette.glass && style.aurora
+    val shownPalette = if (glassAurora) palette.copy(background = SolidColor(Color.Transparent)) else palette
 
     val scheme = if (palette.isDark) {
         darkColorScheme(
@@ -119,14 +145,23 @@ fun AshuDialerTheme(
     }
 
     CompositionLocalProvider(
-        LocalDialerPalette provides palette,
+        LocalDialerPalette provides shownPalette,
         LocalDensity provides scaledDensity,
-        LocalButtonDepth provides buttonDepth
+        LocalButtonDepth provides buttonDepth,
+        LocalAshuStyle provides style
     ) {
         MaterialTheme(
             colorScheme = scheme,
-            typography = DialerTypography,
-            content = content
-        )
+            typography = DialerTypography
+        ) {
+            if (glassAurora) {
+                Box(Modifier.fillMaxSize()) {
+                    AuroraBackground(palette = palette)
+                    content()
+                }
+            } else {
+                content()
+            }
+        }
     }
 }

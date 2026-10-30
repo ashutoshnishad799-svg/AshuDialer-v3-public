@@ -112,6 +112,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // v4 optional cloud backup: WorkManager runs the uploads (survives app close, waits for Wi-Fi,
+    // retries with back-off) and DocumentFile writes into the folder picked in Android's file picker.
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.documentfile:documentfile:1.0.1")
+
     // Real, published Maven Central coordinates - confirmed directly against
     // central.sonatype.com before use, matching what Ever-Dialer's own recorder module declares.
     // `api` (not `implementation`): the :app module's setup screen talks to Shizuku's listener API

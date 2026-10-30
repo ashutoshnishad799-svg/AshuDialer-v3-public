@@ -94,7 +94,7 @@ fun AddCallDialog(
                 .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.displayCutout))
                 .imePadding()
                 .clip(RoundedCornerShape(24.dp))
-                .background(palette.background)
+                .background(palette.opaqueBackground)
                 .padding(18.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

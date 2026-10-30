@@ -52,6 +52,20 @@ This project is a derivative work. The original authors keep their copyright.
 3. Shizuku API - https://github.com/RikkaApps/Shizuku-API
    Copyright (C) RikkaApps. License: Apache-2.0.
 
+4. Ever Dialer - https://github.com/hari161008/Ever-Dialer
+   License: GPL-3.0. The recorder module groundwork is credited in the README; for 2.0.0 its feature
+   lists also inspired the haptic-strength, bottom-bar and glass options. No further code was copied.
+
+5. CallVault - https://github.com/madkongo/CallVault
+   License: GPL-3.0 with additional terms (it is itself a fork of ShizuCallRecorder). IDEAS ONLY were
+   taken for 2.0.0: backing recordings up through the system file picker / Drive app, marking moments,
+   stars, tags and notes. The code in Ashu Phone was written separately. The recorder in Ashu Phone is a
+   modified fork derived from ShizuCallRecorder (see item 1); that is also stated on the About screen.
+
+6. JemRec - https://github.com/jemcik/JemRec
+   Copyright 2026 Yevhen Yemchynskyi. License: Apache-2.0. IDEAS ONLY (marking moments, discarding very
+   short recordings, recorder health checks). No JemRec code is included.
+
 --------------------------------------------------------------------------------
 THIRD-PARTY LIBRARIES (used unmodified, under their own licenses)
 --------------------------------------------------------------------------------
@@ -65,3 +79,10 @@ THIRD-PARTY LIBRARIES (used unmodified, under their own licenses)
 
 The Apache-2.0 components are compatible with GPL-3.0 and are combined here under
 GPL-3.0-or-later.
+
+--------------------------------------------------------------------------------
+MODIFICATION NOTICE (GPL-3.0 section 5(a))
+--------------------------------------------------------------------------------
+Version 2.0.0 was modified on 30 October 2026. The files that were added or changed are listed in
+CHANGELOG.md. Newly used libraries: androidx.work:work-runtime-ktx and androidx.documentfile
+(Google, Apache-2.0).

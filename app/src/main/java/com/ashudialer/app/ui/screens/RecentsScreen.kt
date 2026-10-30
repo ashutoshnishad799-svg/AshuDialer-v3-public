@@ -157,22 +157,31 @@ fun RecentsScreen(
     }
 
     val query = searchQuery.trim()
+    // v4: distinctBy(id) guards the LazyColumn keys below against any repeated row.
+    // Digits typed with spaces/dashes ("98765 43", "98765-43") also match now.
+    val queryDigits = remember(query) { query.filter { it.isDigit() } }
     val filtered = remember(filteredByTab, query) {
         if (query.isEmpty()) filteredByTab
         else filteredByTab.filter {
             it.displayName.contains(query, ignoreCase = true) ||
-                it.phoneNumber.contains(query, ignoreCase = true)
-        }
+                it.phoneNumber.contains(query, ignoreCase = true) ||
+                (queryDigits.length >= 2 && it.phoneNumber.filter { ch -> ch.isDigit() }.contains(queryDigits))
+        }.distinctBy { it.id }
     }
     // Search is useful even when there is no matching recent call: surface a
     // saved contact directly so a person can still call/open the contact
     // instead of getting a dead-end "No matches" state.
+    // v4 CRASH FIX: searchContacts holds ONE ROW PER PHONE NUMBER, so a person with two numbers (or the
+    // same number saved as "98765 43210" and "+91 98765 43210") appeared twice with the SAME contactId.
+    // That id was used as the LazyColumn key below -> "Key was already used" -> the app crashed for
+    // exactly those number combinations. Now: one row per person, and the key is unique by construction.
     val contactMatches = remember(searchContacts, query) {
         if (query.length < 2) emptyList()
         else searchContacts.filter {
             it.displayName.contains(query, ignoreCase = true) ||
-                it.phoneNumber.contains(query, ignoreCase = true)
-        }.take(5)
+                it.phoneNumber.contains(query, ignoreCase = true) ||
+                (queryDigits.length >= 2 && it.phoneNumber.filter { ch -> ch.isDigit() }.contains(queryDigits))
+        }.distinctBy { it.contactId }.take(5)
     }
 
     // Optional: one row per number per calendar day. Applied AFTER the tab/search filters so the
@@ -345,7 +354,7 @@ fun RecentsScreen(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
                         )
                     }
-                    items(contactMatches, key = { it.contactId }) { contact ->
+                    items(contactMatches, key = { "contact_" + it.contactId }) { contact ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -410,6 +419,13 @@ fun RecentsScreen(
                         )
 
                         item(key = "call_${call.id}") {
+                            // v4: swipe right = call, swipe left = message (Personalize > Motion & touch)
+                            SwipeableCallRow(
+                                enabled = !selectionMode,
+                                shape = shape,
+                                onCall = { onCall(call) },
+                                onMessage = { onMessage(call) }
+                            ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -444,6 +460,7 @@ fun RecentsScreen(
                                         modifier = Modifier.padding(start = 70.dp)
                                     )
                                 }
+                            }
                             }
                         }
                     }
@@ -967,4 +984,73 @@ private fun formatRelativeShort(millis: Long): String {
 private fun formatTime(millis: Long): String {
     val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
     return sdf.format(Date(millis))
+}
+
+/**
+ * v4 swipe actions for one recent-call row: drag right to call back, drag left to send a message.
+ * The row always springs back to rest (the action runs once as the swipe completes), so nothing is
+ * ever left half-open and the list never changes underneath the finger. Turned off when the person
+ * disables it in Personalize or while rows are being selected.
+ */
+@androidx.compose.material3.ExperimentalMaterial3Api
+@Composable
+private fun SwipeableCallRow(
+    enabled: Boolean,
+    shape: androidx.compose.ui.graphics.Shape,
+    onCall: () -> Unit,
+    onMessage: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val style = com.ashudialer.app.ui.theme.LocalAshuStyle.current
+    if (!enabled || !style.swipeActions) {
+        content()
+        return
+    }
+    val palette = LocalDialerPalette.current
+    val currentOnCall by androidx.compose.runtime.rememberUpdatedState(onCall)
+    val currentOnMessage by androidx.compose.runtime.rememberUpdatedState(onMessage)
+    val state = androidx.compose.material3.rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd -> currentOnCall()
+                androidx.compose.material3.SwipeToDismissBoxValue.EndToStart -> currentOnMessage()
+                else -> Unit
+            }
+            false // always spring back to rest
+        },
+        positionalThreshold = { distance -> distance * 0.34f }
+    )
+    androidx.compose.material3.SwipeToDismissBox(
+        state = state,
+        backgroundContent = {
+            val direction = state.dismissDirection
+            val isCall = direction == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
+            val settled = direction == androidx.compose.material3.SwipeToDismissBoxValue.Settled
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(
+                        when {
+                            settled -> androidx.compose.ui.graphics.Color.Transparent
+                            isCall -> palette.callGreen
+                            else -> palette.accent
+                        }
+                    )
+                    .padding(horizontal = 26.dp),
+                horizontalArrangement = if (isCall) Arrangement.Start else Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!settled) {
+                    Icon(
+                        if (isCall) Icons.Filled.Call else Icons.Filled.Message,
+                        contentDescription = if (isCall) "Call" else "Message",
+                        tint = androidx.compose.ui.graphics.Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
+        },
+        content = { content() }
+    )
 }
