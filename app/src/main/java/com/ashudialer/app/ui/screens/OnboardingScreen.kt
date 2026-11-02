@@ -454,11 +454,11 @@ private fun SmartSearchArt(color: Color, palette: DialerPalette) {
                         Row(
                             Modifier
                                 .matchParentSize()
-                                .background(palette.callGreen.copy(alpha = 0.85f * swipe.value))
+                                .background(palette.callGreen.copy(alpha = (0.85f * swipe.value).coerceIn(0f, 1f)))
                                 .padding(start = 22.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Filled.Call, contentDescription = null, tint = Color.White.copy(alpha = swipe.value), modifier = Modifier.size(24.dp))
+                            Icon(Icons.Filled.Call, contentDescription = null, tint = Color.White.copy(alpha = swipe.value.coerceIn(0f, 1f)), modifier = Modifier.size(24.dp))
                         }
                     }
                     Row(
