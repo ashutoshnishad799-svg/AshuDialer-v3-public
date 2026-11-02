@@ -93,13 +93,15 @@ private val NavCellHeight = 56.dp
 @Composable
 fun DialerBottomNav(
     selected: DialerTab,
-    onSelect: (DialerTab) -> Unit
+    onSelect: (DialerTab) -> Unit,
+    // v2.0.1: the tabs to show, already in the person's chosen order (see visibleNavTabs)
+    tabs: List<DialerTab> = DialerTab.values().toList()
 ) {
     val palette = LocalDialerPalette.current
     val style = LocalAshuStyle.current
     val view = androidx.compose.ui.platform.LocalView.current
     val hapticState = rememberUpdatedState(style.hapticLevel)
-    val tabs = DialerTab.values()
+    val selIndex = tabs.indexOf(selected).coerceAtLeast(0)
     val currentOnSelect by rememberUpdatedState(onSelect)
     // v4: a light tick every time the selected tab changes (strength follows Personalize > Haptics).
     val fireSelect: (DialerTab) -> Unit = { tab ->
@@ -115,19 +117,19 @@ fun DialerBottomNav(
 
     // Pill position in tab units (0.0 = first tab ... 4.0 = last). NaN while no finger is dragging.
     var dragPosition by remember { mutableFloatStateOf(Float.NaN) }
-    var lastDragPosition by remember { mutableFloatStateOf(selected.ordinal.toFloat()) }
+    var lastDragPosition by remember { mutableFloatStateOf(selIndex.toFloat()) }
     var pressedIndex by remember { mutableIntStateOf(-1) }
-    val glide = remember { Animatable(selected.ordinal.toFloat()) }
+    val glide = remember { Animatable(selIndex.toFloat()) }
     val dragging = !dragPosition.isNaN()
 
-    LaunchedEffect(selected) {
-        if (!dragging) glide.animateTo(selected.ordinal.toFloat(), spring(dampingRatio = 0.78f, stiffness = 420f))
+    LaunchedEffect(selected, tabs) {
+        if (!dragging) glide.animateTo(selIndex.toFloat(), spring(dampingRatio = 0.78f, stiffness = 420f))
     }
     LaunchedEffect(dragging) {
         if (!dragging) {
             // The finger lifted: carry on from where the pill was left instead of jumping back to the old tab.
             glide.snapTo(lastDragPosition)
-            glide.animateTo(selected.ordinal.toFloat(), spring(dampingRatio = 0.78f, stiffness = 420f))
+            glide.animateTo(selIndex.toFloat(), spring(dampingRatio = 0.78f, stiffness = 420f))
         }
     }
     val position: () -> Float = { if (dragPosition.isNaN()) glide.value else dragPosition }
@@ -150,7 +152,7 @@ fun DialerBottomNav(
             Modifier
                 .fillMaxWidth()
                 .height(NavCellHeight)
-                .pointerInput(tabs.size) {
+                .pointerInput(tabs) {
                     val slop = viewConfiguration.touchSlop
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -202,7 +204,7 @@ fun DialerBottomNav(
                         translationX = pos * cellWpx
                         // v4 "liquid" stretch: the glass bubble elongates while it travels to a new tab
                         // and settles back into shape as it arrives.
-                        val stretch = if (style.animationsOn) abs(pos - selected.ordinal).coerceIn(0f, 1f) else 0f
+                        val stretch = if (style.animationsOn) abs(pos - selIndex).coerceIn(0f, 1f) else 0f
                         scaleX = 1f + 0.24f * stretch
                         scaleY = 1f - 0.08f * stretch
                     }
@@ -298,3 +300,15 @@ private fun iconFor(tab: DialerTab, selected: Boolean): ImageVector = when (tab)
     DialerTab.PROTECT -> if (selected) Icons.Filled.Shield else Icons.Outlined.Shield
     DialerTab.MORE -> if (selected) Icons.Filled.MoreHoriz else Icons.Outlined.MoreHoriz
 }
+
+/** The saved order as tabs. Unknown names are ignored and any tab missing from the list is appended. */
+fun parseNavOrder(csv: String): List<DialerTab> {
+    val parsed = csv.split(',').mapNotNull { n -> DialerTab.values().firstOrNull { it.name == n.trim() } }.distinct()
+    return parsed + DialerTab.values().filter { it !in parsed }
+}
+
+fun serializeNavOrder(tabs: List<DialerTab>): String = tabs.joinToString(",") { it.name }
+
+/** Tabs for the bottom bar: the chosen order, minus the hidden ones. Contacts, Protect and More always stay. */
+fun visibleNavTabs(order: String, showDialer: Boolean, showRecent: Boolean): List<DialerTab> =
+    parseNavOrder(order).filter { (it != DialerTab.DIALER || showDialer) && (it != DialerTab.RECENT || showRecent) }

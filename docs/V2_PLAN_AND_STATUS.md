@@ -1,4 +1,4 @@
-# Ashu Phone 2.0.0 - plan and status
+# Ashu Phone 2.0.x - plan and status
 
 ## The plan (from the owner's brief)
 1. Fix the two bugs: Recents search crash; notification timer running before the call is answered.
@@ -84,3 +84,14 @@ Paste the error and it is a one-line fix each time.
   `RecordingCloudSection.kt`
 - Recording data: `appcalls/.../recording/RecordingMetaStore.kt` (stars, tags, notes, marks, cloud state)
 - Cloud backup: `appcalls/.../cloud/` (`CloudPrefs`, `CloudSync`, `CloudCopyWorker`)
+
+
+## 2.0.1 additions (after the first real-device test)
+See CHANGELOG.md for the full list. New things worth testing first:
+- Recents tab: the round Dialer button above the bar; tap it, then tap it again (or the backdrop) to close.
+- Contacts / More tab: the round Recents button.
+- Personalize > Bottom bar: move tabs, hide Dialer / Recents. Personalize > Dialer: floating window, layouts, wide suggestions.
+- A call with call waiting, then merge: title says "Conference call (2)", Manage shows both people.
+- Recording settings > Back up recordings > Test backup.
+- More > Voicemail, and hold 1 on the dial pad.
+Build status is the same as before: written without an Android SDK, not compiled here.

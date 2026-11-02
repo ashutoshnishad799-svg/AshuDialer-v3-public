@@ -49,6 +49,14 @@ Debug and local builds skip the check. This raises the bar, it cannot make modif
 secret and share only the Releases page. Auto Backup is off, Private Space blocks screenshots, and debug/verbose logging
 is stripped from release builds.
 
+## What's new in 2.0.1 (on top of 2.0.0)
+
+- **Smoother**: lighter glass drawing, cached aurora, faster Recordings.
+- **Floating Dialer / Recents buttons** above the bar that open glass windows; optional floating dialer from the Dialer tab; bottom bar order and show/hide.
+- **Conference calls** (Merge, Swap, Manage, remove people) and **redesigned call notifications**.
+- **Voicemail screen**, dial pad layouts, wide suggestions.
+- **Google Drive backup** by signing in, or by picking a folder, with a Test button ([docs/DRIVE_BACKUP.md](docs/DRIVE_BACKUP.md)).
+
 ## What's new in 2.0.0
 
 - **Simple by default**: plain White and plain Black ("Auto" follows your phone). Liquid Glass, Frost

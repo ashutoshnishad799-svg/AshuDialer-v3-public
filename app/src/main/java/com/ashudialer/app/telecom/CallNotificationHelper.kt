@@ -34,6 +34,14 @@ object CallNotificationHelper {
 
     private var ongoingCallStartMillis: Long = 0L
 
+    /**
+     * "auto" = the system's own call notification (which Android can show as a call chip in the status bar)
+     * on every phone except Xiaomi / Redmi / POCO, "system" = always that, "glass" = always the themed card.
+     * Set by PixelInCallService from Personalize > Calls.
+     */
+    @Volatile
+    var callStyleMode: String = "auto"
+
     // v4 FIX ("seconds start running before I even pick up"): the ongoing-call notification used to
     // start its chronometer the moment an OUTGOING call began dialing, so the timer ran while the
     // other phone was still ringing. The timer now starts only once the call is really connected
@@ -361,7 +369,10 @@ object CallNotificationHelper {
                 else -> "Ongoing call"
             }
 
-            val views = buildGlassLayout(context, callerName, statusText = statusLabel, incoming = false)
+            val views = buildGlassLayout(
+                context, callerName, statusText = statusLabel, incoming = false,
+                timerStartMillis = if (connected && !onHold) ongoingCallStartMillis else 0L
+            )
             val compactViews = buildCompactOngoingLayout(context, callerName, statusLabel)
 
             // Bug fix: this was missing FLAG_ACTIVITY_SINGLE_TOP and
@@ -411,7 +422,12 @@ object CallNotificationHelper {
                 Build.MANUFACTURER.equals("redmi", true) ||
                 Build.MANUFACTURER.equals("poco", true)
 
-            val notification = if (isXiaomiFamily) {
+            val useSystemCallStyle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && when (callStyleMode) {
+                "system" -> true
+                "glass" -> false
+                else -> !isXiaomiFamily
+            }
+            val notification = if (!useSystemCallStyle) {
                 builder
                     .setStyle(NotificationCompat.DecoratedCustomViewStyle())
                     .setCustomContentView(compactViews)
@@ -648,7 +664,8 @@ object CallNotificationHelper {
         context: Context,
         callerName: String,
         statusText: String,
-        incoming: Boolean
+        incoming: Boolean,
+        timerStartMillis: Long = 0L
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.notification_call_glass)
         val style = notificationThemeStyle(context)
@@ -657,6 +674,19 @@ object CallNotificationHelper {
         views.setTextColor(R.id.notif_status, style.secondaryText)
         views.setTextViewText(R.id.notif_name, callerName)
         views.setTextViewText(R.id.notif_status, statusText)
+        if (!incoming && timerStartMillis > 0L) {
+            // a live mm:ss next to the status, so the card shows how long the call has been going
+            views.setViewVisibility(R.id.notif_dot, android.view.View.VISIBLE)
+            views.setViewVisibility(R.id.notif_timer, android.view.View.VISIBLE)
+            views.setTextColor(R.id.notif_dot, style.secondaryText)
+            views.setTextColor(R.id.notif_timer, style.secondaryText)
+            views.setChronometer(
+                R.id.notif_timer,
+                android.os.SystemClock.elapsedRealtime() - (System.currentTimeMillis() - timerStartMillis),
+                null,
+                true
+            )
+        }
 
         if (incoming) {
             views.setViewVisibility(R.id.notif_actions_row, android.view.View.GONE)
@@ -683,6 +713,18 @@ object CallNotificationHelper {
                 AudioRouteController(context).currentRoute()
             }
             val muted = liveState?.isMuted ?: CallAudioQuickActions.isMuted(context)
+            views.setTextColor(R.id.notif_btn_speaker_label, style.primaryText)
+            views.setTextColor(R.id.notif_btn_mute_label, style.primaryText)
+            views.setTextViewText(
+                R.id.notif_btn_speaker_label,
+                when (currentRoute) {
+                    AudioRoute.SPEAKER -> "Speaker on"
+                    AudioRoute.BLUETOOTH -> "Bluetooth"
+                    AudioRoute.WIRED_HEADSET -> "Headset"
+                    else -> "Speaker"
+                }
+            )
+            views.setTextViewText(R.id.notif_btn_mute_label, if (muted) "Muted" else "Mute")
             views.setInt(
                 R.id.notif_btn_speaker, "setBackgroundResource",
                 if (currentRoute == AudioRoute.EARPIECE) R.drawable.bg_notification_pill_neutral else style.activePillRes
@@ -729,21 +771,37 @@ object CallNotificationHelper {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val title = if (missedCallCount > 1) "$missedCallCount missed calls" else "Missed call"
-            val text = if (missedCallCount > 1) "Most recent: $callerName" else callerName
+            val title = if (missedCallCount > 1) "$missedCallCount missed calls" else "Missed call from $callerName"
+            val text = if (missedCallCount > 1) "Most recent: $callerName" else
+                (callerNumber.takeIf { it.isNotBlank() && it != "Unknown" && it != callerName } ?: "Tap to open Recents")
 
             val builder = NotificationCompat.Builder(context, AshuDialerApp.CHANNEL_MISSED_CALL)
                 .setSmallIcon(R.drawable.ic_missed_call_notification)
+                // a red icon + title colour is what tells you at a glance that this one is a MISSED call
+                .setColor(0xFFE5484D.toInt())
                 .setContentTitle(title)
                 .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
                 .setAutoCancel(true)
+                .setShowWhen(true)
+                .setWhen(System.currentTimeMillis())
                 .setContentIntent(contentPendingIntent)
                 .setNumber(missedCallCount)
 
             if (callerNumber.isNotBlank() && callerNumber != "Unknown") {
                 builder.addAction(0, "Call back", callBackPendingIntent)
+                val smsIntent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:" + android.net.Uri.encode(callerNumber))).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                builder.addAction(
+                    0, "Message",
+                    PendingIntent.getActivity(
+                        context, MISSED_CALL_NOTIFICATION_ID + 1, smsIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                )
             }
 
             val manager = context.getSystemService(NotificationManager::class.java)

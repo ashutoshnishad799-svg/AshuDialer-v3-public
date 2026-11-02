@@ -114,6 +114,8 @@ class AshuDialerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // v2.0.1: a periodic check that queues recordings the cloud backup missed (no-op unless backup is on)
+        runCatching { com.ashudialer.app.appcalls.cloud.CloudSync.ensureSweepScheduled(this) }
         // First, so a crash during any of the setup below is still caught.
         com.ashudialer.app.util.CrashLogCollector.install(this)
         database = AshuDialerDatabase.getInstance(this)

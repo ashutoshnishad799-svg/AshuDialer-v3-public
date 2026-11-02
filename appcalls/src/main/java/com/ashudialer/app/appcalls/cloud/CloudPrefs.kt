@@ -73,10 +73,28 @@ class CloudPrefs(context: Context) {
         get() = prefs.getString("last_error", "") ?: ""
         set(v) = prefs.edit { putString("last_error", v) }
 
-    /** The folder is picked and the feature is on. */
-    val isActive: Boolean get() = enabled && !folderUri.isNullOrBlank()
+    /** MODE_FOLDER (a folder picked in Android's file picker) or MODE_DRIVE (direct upload after Google sign-in). */
+    var mode: String
+        get() = prefs.getString("mode", MODE_FOLDER) ?: MODE_FOLDER
+        set(v) = prefs.edit { putString("mode", v) }
+
+    /** MODE_DRIVE: the person has allowed Ashu Phone to put files in their Google Drive. */
+    var driveConnected: Boolean
+        get() = prefs.getBoolean("drive_connected", false)
+        set(v) = prefs.edit { putBoolean("drive_connected", v) }
+
+    /** MODE_DRIVE: id of the "Ashu Phone Recordings" folder in the person's Drive (cached). */
+    var driveFolderId: String?
+        get() = prefs.getString("drive_folder_id", null)
+        set(v) = prefs.edit { if (v == null) remove("drive_folder_id") else putString("drive_folder_id", v) }
+
+    /** The feature is on AND there is somewhere to put files. */
+    val isActive: Boolean
+        get() = enabled && (if (mode == MODE_DRIVE) driveConnected else !folderUri.isNullOrBlank())
 
     companion object {
         private const val PREFS_NAME = "ashu_cloud_backup_prefs"
+        const val MODE_FOLDER = "folder"
+        const val MODE_DRIVE = "drive"
     }
 }

@@ -148,15 +148,15 @@ fun RecordingsScreen(
         withContext(Dispatchers.IO) {
             var sinceRefresh = 0
             for (f in recordings) {
-                if (store.get(f.name).durationMs <= 0L) {
+                // 0 = never measured. -1 = could not be read: remembered so a broken file is not retried
+                // every time this screen opens.
+                if (store.get(f.name).durationMs == 0L) {
                     val d = RecordingProbe.durationMs(context, f)
-                    if (d > 0L) {
-                        store.update(f.name) { it.copy(durationMs = d) }
-                        sinceRefresh++
-                        if (sinceRefresh >= 5) {
-                            sinceRefresh = 0
-                            metaVersion++
-                        }
+                    store.update(f.name) { it.copy(durationMs = if (d > 0L) d else -1L) }
+                    sinceRefresh++
+                    if (sinceRefresh >= 8) {
+                        sinceRefresh = 0
+                        metaVersion++
                     }
                 }
             }
@@ -197,8 +197,19 @@ fun RecordingsScreen(
     }
 
     // ---- data --------------------------------------------------------------------------------
-    val allItems = remember(recordings, metas) {
-        recordings.distinctBy { it.absolutePath }.map { buildRecItem(it, metas[it.name] ?: RecMeta()) }
+    // File sizes / dates are read once, on a background thread - never while the list is drawing.
+    val fileStats by produceState(initialValue = emptyMap<String, Pair<Long, Long>>(), recordings) {
+        value = withContext(Dispatchers.IO) {
+            recordings.associate { f ->
+                f.absolutePath to (runCatching { f.length() }.getOrDefault(0L) to runCatching { f.lastModified() }.getOrDefault(0L))
+            }
+        }
+    }
+    val allItems = remember(recordings, metas, fileStats) {
+        recordings.distinctBy { it.absolutePath }.map { f ->
+            val stat = fileStats[f.absolutePath]
+            buildRecItem(f, metas[f.name] ?: RecMeta(), stat?.first ?: 0L, stat?.second ?: 0L)
+        }
     }
     val q = query.trim().lowercase()
     val qDigits = remember(q) { q.filter { it.isDigit() } }
@@ -452,7 +463,7 @@ fun RecordingsScreen(
                         totalBytes = totalBytes,
                         cloudCount = cloudCount,
                         cloudActive = cloudActive,
-                        cloudFolder = cloudPrefs.folderName,
+                        cloudFolder = if (cloudPrefs.mode == com.ashudialer.app.appcalls.cloud.CloudPrefs.MODE_DRIVE) "Google Drive" else cloudPrefs.folderName,
                         cloudWifiOnly = cloudPrefs.wifiOnly,
                         cloudPending = cloudPending,
                         onOpenSettings = onOpenRecordingSettings,
@@ -579,7 +590,7 @@ fun RecordingsScreen(
                                     touch()
                                 }
                             },
-                            modifier = Modifier.animateItemPlacement()
+                            modifier = Modifier
                         )
                     }
                 }

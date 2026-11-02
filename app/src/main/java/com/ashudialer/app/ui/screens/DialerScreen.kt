@@ -160,6 +160,11 @@ fun DialerScreen(
     // that same number, passed in from Recents (most recent entry) rather
     // than computed here, since MainActivity already holds that list.
     lastCalledNumber: String? = null,
+    // long-press 1 on the dial pad
+    onVoicemail: () -> Unit = {},
+    // v2.0.1 Personalize > Dialer: "classic" | "compact" | "glass", and edge-to-edge contact suggestions
+    layoutStyle: String = "classic",
+    wideSuggestions: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val palette = LocalDialerPalette.current
@@ -184,6 +189,15 @@ fun DialerScreen(
      * middle of a pasted or edited number inserts where the cursor actually
      * is, matching how every other text field on the device behaves.
      */
+    /** Replaces the character just before the cursor (used when a long-press turns a typed digit into something else). */
+    fun replaceLastCharWith(text: String) {
+        val pos = numberField.selection.start.coerceIn(0, numberField.text.length)
+        if (pos > 0) {
+            numberField = TextFieldValue(numberField.text.removeRange(pos - 1, pos), TextRange(pos - 1))
+        }
+        if (text.isNotEmpty()) insertAtCursor(text)
+    }
+
     fun insertAtCursor(text: String) {
         val start = numberField.selection.start.coerceIn(0, numberField.text.length)
         val end = numberField.selection.end.coerceIn(0, numberField.text.length)
@@ -359,7 +373,12 @@ fun DialerScreen(
         // Height left for 4 key rows + the call button once the fixed zones are taken out; the call button is
         // about 0.86 of a key, so the whole stack is (4 + 0.86) keys plus the margins.
         val keyByHeight = (availH - topPadF - numberZoneF - hintZoneF - minMatchF - callTopGapF - callBottomGapF - 4f * haloF) / 4.86f
-        val keySizeF = minOf(keyByHeight, keyFromWidth, 70f).coerceAtLeast(44f)
+        val keyCap = when (layoutStyle) {
+            "compact" -> 58f
+            "glass" -> 74f
+            else -> 70f
+        }
+        val keySizeF = minOf(keyByHeight, keyFromWidth, keyCap).coerceAtLeast(44f)
         val callSizeF = (keySizeF * 0.86f).coerceIn(46f, 60f)
 
         val bottomBlockF = 4f * (keySizeF + haloF) + callTopGapF + callSizeF + callBottomGapF
@@ -416,6 +435,8 @@ fun DialerScreen(
                 modifier = Modifier.fillMaxWidth().heightIn(max = matchZoneH)
             ) {
                 MatchedContactsList(
+                    wide = wideSuggestions,
+                    bleed = sidePad,
                     matchedByContactId = matchedByContactId,
                     typedDigits = number,
                     palette = palette,
@@ -428,7 +449,10 @@ fun DialerScreen(
 
         // The typed number: fixed height, centred, directly above the chips row and the keys.
         Box(
-            modifier = Modifier.fillMaxWidth().height(numberZoneH),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(numberZoneH)
+                .then(if (layoutStyle == "glass") Modifier.glassCard(palette, 22.dp) else Modifier),
             contentAlignment = Alignment.Center
         ) {
             BasicTextField(
@@ -513,6 +537,12 @@ fun DialerScreen(
                             // that lands a little to one side of a key still presses THAT key, which is what makes fast
                             // typing forgiving.
                             modifier = Modifier.weight(1f),
+                            // v2.0.1: hold 0 for "+", hold 1 for voicemail (the digit typed on touch-down is taken back)
+                            onLongPress = when (key.digit) {
+                                "0" -> { { replaceLastCharWith("+") } }
+                                "1" -> { { replaceLastCharWith(""); onVoicemail() } }
+                                else -> null
+                            },
                             onPress = {
                                 insertAtCursor(key.digit)
                                 dtmfPlayer.play(key.digit.first())
@@ -630,6 +660,8 @@ fun DialerScreen(
  */
 @Composable
 private fun MatchedContactsList(
+    wide: Boolean = false,
+    bleed: androidx.compose.ui.unit.Dp = 0.dp,
     matchedByContactId: List<Pair<String, List<Contact>>>,
     typedDigits: String,
     palette: com.ashudialer.app.ui.theme.DialerPalette,
@@ -657,19 +689,23 @@ private fun MatchedContactsList(
     LazyColumn(
         modifier = Modifier
             .padding(top = 8.dp)
+            // wide: the box runs edge to edge (it bleeds out into the dial pad's side margins) and is taller
+            .then(if (wide) Modifier.bleedHorizontally(bleed) else Modifier)
             .fillMaxWidth()
-            .heightIn(max = 340.dp)
-            .glassCard(palette, 20.dp),
+            .heightIn(max = if (wide) 420.dp else 340.dp)
+            .glassCard(palette, if (wide) 26.dp else 20.dp),
     ) {
         items(rows, key = { it.contactId + "|" + it.phoneNumber }) { contact ->
-            MatchedContactRow(
-                contact = contact,
-                typedDigits = typedDigits,
-                palette = palette,
-                onCall = { onCall(contact.phoneNumber) },
-                onMessage = { onMessage(contact.phoneNumber) },
-                onAvatarClick = { onAvatarClick(contact) }
-            )
+            Box(Modifier.padding(vertical = if (wide) 6.dp else 0.dp)) {
+                MatchedContactRow(
+                    contact = contact,
+                    typedDigits = typedDigits,
+                    palette = palette,
+                    onCall = { onCall(contact.phoneNumber) },
+                    onMessage = { onMessage(contact.phoneNumber) },
+                    onAvatarClick = { onAvatarClick(contact) }
+                )
+            }
             if (contact != rows.last()) {
                 HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
             }
@@ -845,6 +881,7 @@ private fun DialerKey(
     palette: com.ashudialer.app.ui.theme.DialerPalette,
     size: androidx.compose.ui.unit.Dp = 78.dp,
     modifier: Modifier = Modifier,
+    onLongPress: (() -> Unit)? = null,
     onPress: () -> Unit
 ) {
     // The digit is entered the moment the finger goes DOWN (and the tone and haptic start with it), exactly like a
@@ -871,6 +908,7 @@ private fun DialerKey(
             .height(size + 10.dp)
             .pointerInput(key) {
                 detectTapGestures(
+                    onLongPress = { onLongPress?.invoke() },
                     onPress = {
                         pressed = true
                         fire()
@@ -914,4 +952,13 @@ private fun DialerKey(
             }
         }
     }
+}
+
+/** Lets a child be wider than its parent by [bleed] on each side (used for the edge-to-edge suggestion box). */
+private fun Modifier.bleedHorizontally(bleed: androidx.compose.ui.unit.Dp): Modifier = this.layout { measurable, constraints ->
+    val extra = (bleed * 2).roundToPx()
+    val placeable = measurable.measure(
+        constraints.copy(minWidth = constraints.maxWidth + extra, maxWidth = constraints.maxWidth + extra)
+    )
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-bleed.roundToPx(), 0) }
 }

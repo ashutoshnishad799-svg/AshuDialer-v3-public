@@ -143,7 +143,7 @@ internal enum class SortMode(val id: String, val label: String) {
 private val FILE_STAMP = Regex("""(\d{8})_(\d{6})""")
 
 /** The recording time: from the "yyyyMMdd_HHmmss" stamp in the file name, else the file's own date. */
-internal fun parseWhenMs(file: File): Long {
+internal fun parseWhenMs(file: File, fallbackMs: Long = 0L): Long {
     val m = FILE_STAMP.find(file.name)
     if (m != null) {
         try {
@@ -152,10 +152,11 @@ internal fun parseWhenMs(file: File): Long {
         } catch (_: Exception) {
         }
     }
-    return file.lastModified()
+    return fallbackMs
 }
 
-internal fun buildRecItem(file: File, meta: RecMeta): RecItem {
+/** [sizeBytes] / [modifiedMs] come from a background read - nothing here touches the disk. */
+internal fun buildRecItem(file: File, meta: RecMeta, sizeBytes: Long = 0L, modifiedMs: Long = 0L): RecItem {
     val label = parseRecordingLabel(file.name)
     val incoming = when {
         label.second.startsWith("Incoming") -> true
@@ -167,8 +168,8 @@ internal fun buildRecItem(file: File, meta: RecMeta): RecItem {
         kind = kindOf(file),
         title = label.first.replace('_', ' ').trim().ifBlank { "Unknown" },
         incoming = incoming,
-        whenMs = parseWhenMs(file),
-        sizeBytes = runCatching { file.length() }.getOrDefault(0L),
+        whenMs = parseWhenMs(file, modifiedMs),
+        sizeBytes = sizeBytes,
         meta = meta
     )
 }
@@ -385,7 +386,6 @@ internal fun RecordingCard(
             .liquidGlass(palette, shape)
             .then(if (selected) Modifier.border(2.dp, palette.accent, shape) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .animateContentSize()
             .padding(horizontal = 14.dp, vertical = style.rowPadding + 2.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

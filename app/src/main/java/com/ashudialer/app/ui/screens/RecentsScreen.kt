@@ -47,6 +47,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -799,7 +805,8 @@ private fun RecentRow(
                 onClick = if (selectionMode) onToggleSelect else onOpenActions,
                 onLongClick = onLongPress
             )
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            // v2.0.1 Personalize > List spacing
+            .padding(horizontal = 14.dp, vertical = com.ashudialer.app.ui.theme.LocalAshuStyle.current.rowPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
@@ -987,12 +994,17 @@ private fun formatTime(millis: Long): String {
 }
 
 /**
- * v4 swipe actions for one recent-call row: drag right to call back, drag left to send a message.
- * The row always springs back to rest (the action runs once as the swipe completes), so nothing is
- * ever left half-open and the list never changes underneath the finger. Turned off when the person
- * disables it in Personalize or while rows are being selected.
+ * v4 swipe actions for one recent-call row: a long, deliberate drag RIGHT calls back, LEFT sends a message.
+ *
+ * Built by hand (not Material's SwipeToDismissBox) because that one also fires on a quick flick, which
+ * made the action trigger by accident while scrolling the list. Here:
+ *  - vertical scrolling is never touched (the drag only starts when the finger moves sideways first),
+ *  - the row follows the finger at 60% speed, so the finger has to travel about 70% of the screen width,
+ *  - speed does not matter, only distance: a fast flick that stops short does nothing,
+ *  - there is a light haptic tick and the icon grows the moment the action is "armed",
+ *  - the row always springs back; the action runs once when the finger is lifted past the line.
+ * Turned off in Personalize, or while rows are being selected.
  */
-@androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 private fun SwipeableCallRow(
     enabled: Boolean,
@@ -1007,50 +1019,66 @@ private fun SwipeableCallRow(
         return
     }
     val palette = LocalDialerPalette.current
-    val currentOnCall by androidx.compose.runtime.rememberUpdatedState(onCall)
-    val currentOnMessage by androidx.compose.runtime.rememberUpdatedState(onMessage)
-    val state = androidx.compose.material3.rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            when (value) {
-                androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd -> currentOnCall()
-                androidx.compose.material3.SwipeToDismissBoxValue.EndToStart -> currentOnMessage()
-                else -> Unit
-            }
-            false // always spring back to rest
-        },
-        positionalThreshold = { distance -> distance * 0.34f }
-    )
-    androidx.compose.material3.SwipeToDismissBox(
-        state = state,
-        backgroundContent = {
-            val direction = state.dismissDirection
-            val isCall = direction == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
-            val settled = direction == androidx.compose.material3.SwipeToDismissBoxValue.Settled
+    val scope = rememberCoroutineScope()
+    val view = LocalView.current
+    val offset = remember { androidx.compose.animation.core.Animatable(0f) }
+    val currentOnCall by rememberUpdatedState(onCall)
+    val currentOnMessage by rememberUpdatedState(onMessage)
+    var widthPx by remember { mutableIntStateOf(0) }
+    var armed by remember { mutableStateOf(false) }
+    val level = style.hapticLevel
+
+    Box(Modifier.fillMaxWidth().onSizeChanged { widthPx = it.width }) {
+        val x = offset.value
+        if (x != 0f) {
+            val toCall = x > 0f
             Row(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .clip(shape)
-                    .background(
-                        when {
-                            settled -> androidx.compose.ui.graphics.Color.Transparent
-                            isCall -> palette.callGreen
-                            else -> palette.accent
-                        }
-                    )
+                    .background((if (toCall) palette.callGreen else palette.accent).copy(alpha = if (armed) 0.95f else 0.55f))
                     .padding(horizontal = 26.dp),
-                horizontalArrangement = if (isCall) Arrangement.Start else Arrangement.End,
+                horizontalArrangement = if (toCall) Arrangement.Start else Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!settled) {
-                    Icon(
-                        if (isCall) Icons.Filled.Call else Icons.Filled.Message,
-                        contentDescription = if (isCall) "Call" else "Message",
-                        tint = androidx.compose.ui.graphics.Color.White,
-                        modifier = Modifier.size(26.dp)
+                Icon(
+                    if (toCall) Icons.Filled.Call else Icons.Filled.Message,
+                    contentDescription = if (toCall) "Call" else "Message",
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.size(if (armed) 32.dp else 24.dp)
+                )
+            }
+        }
+        Box(
+            Modifier
+                .graphicsLayer { translationX = offset.value }
+                .pointerInput(widthPx) {
+                    val line = widthPx * 0.42f
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val final = offset.value
+                            if (final >= line) currentOnCall() else if (final <= -line) currentOnMessage()
+                            armed = false
+                            scope.launch { offset.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 420f)) }
+                        },
+                        onDragCancel = {
+                            armed = false
+                            scope.launch { offset.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 420f)) }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            val next = (offset.value + dragAmount * 0.6f).coerceIn(-widthPx * 0.7f, widthPx * 0.7f)
+                            scope.launch { offset.snapTo(next) }
+                            val nowArmed = kotlin.math.abs(next) >= line
+                            if (nowArmed != armed) {
+                                armed = nowArmed
+                                if (nowArmed && level > 0) {
+                                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                                }
+                            }
+                        }
                     )
                 }
-            }
-        },
-        content = { content() }
-    )
+        ) { content() }
+    }
 }

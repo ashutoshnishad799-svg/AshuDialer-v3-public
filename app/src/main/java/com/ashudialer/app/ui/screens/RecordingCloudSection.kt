@@ -12,6 +12,7 @@ package com.ashudialer.app.ui.screens
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -43,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ashudialer.app.appcalls.cloud.CloudPrefs
 import com.ashudialer.app.appcalls.cloud.CloudSync
+import com.ashudialer.app.appcalls.cloud.FolderKind
 import com.ashudialer.app.appcalls.recording.RecMeta
 import com.ashudialer.app.appcalls.recording.RecordingMarks
 import com.ashudialer.app.appcalls.recording.RecordingMetaStore
@@ -64,17 +67,24 @@ import com.ashudialer.app.telecom.CallRecorder
 import com.ashudialer.app.ui.components.bounceClick
 import com.ashudialer.app.ui.components.liquidGlass
 import com.ashudialer.app.ui.theme.DialerPalette
+import com.google.android.gms.auth.api.identity.Identity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
 /**
- * v4 cloud backup card for the recording settings - fully optional, OFF by default.
+ * Cloud backup card for the recording settings - fully optional, OFF by default.
  *
- * How it works, in plain words (the same words the card shows): the person picks a folder in
- * Android's own file picker - normally a folder inside the Google Drive app. Ashu Phone copies each
- * finished recording into that folder and the Drive app uploads it. There is no Google login in
- * Ashu Phone and nothing to set up in any developer console.
+ * Two ways, chosen right on the card:
+ *  - "Google account": sign in once, recordings go straight to a "Ashu Phone Recordings" folder in your
+ *    Google Drive, named with the contact and date. The easy way.
+ *  - "Folder / File manager": pick a folder in Android's file picker. A folder inside the Drive app is
+ *    uploaded by Drive; a folder on the phone is a plain copy you can see in any file manager. The card
+ *    says clearly which of the two the chosen folder is - choosing a phone folder and expecting Drive was
+ *    the most common mix-up.
  *
  * "Keep recordings only in the cloud" is the optional mode where nothing stays on the phone: a new
  * recording waits in the app's private storage (never the public Music folder) just until its upload
@@ -83,14 +93,23 @@ import java.util.Date
 @Composable
 fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val prefs = remember { CloudPrefs(context) }
     val meta = remember { RecordingMetaStore(context) }
     var tick by remember { mutableIntStateOf(0) }
+    var busy by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var showGuide by remember { mutableStateOf(false) }
 
     // These are re-read whenever `tick` changes (after any switch, picker result or backup action).
     val enabled = remember(tick) { prefs.enabled }
+    val mode = remember(tick) { prefs.mode }
     val folderPicked = remember(tick) { !prefs.folderUri.isNullOrBlank() }
+    val kind = remember(tick) { CloudSync.folderKind(context) }
+    val driveConnected = remember(tick) { prefs.driveConnected }
+    val ready = if (mode == CloudPrefs.MODE_DRIVE) driveConnected else folderPicked
     val pending = remember(tick) { meta.all().values.count { it.cloud == RecMeta.CLOUD_QUEUED } }
+    val waiting = remember(tick, pending) { if (pending > 0) CloudSync.waitingReason(context) else null }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -102,6 +121,37 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
             }
             tick++
         }
+    }
+    val consent = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        try {
+            val r = Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(res.data)
+            if (!r.accessToken.isNullOrBlank()) {
+                prefs.driveConnected = true
+                prefs.mode = CloudPrefs.MODE_DRIVE
+                prefs.enabled = true
+                Toast.makeText(context, "Google Drive connected", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Couldn't connect Google Drive: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+        tick++
+    }
+    fun connectDrive() {
+        Identity.getAuthorizationClient(context).authorize(CloudSync.driveAuthorizationRequest())
+            .addOnSuccessListener { r ->
+                val pi = r.pendingIntent
+                if (r.hasResolution() && pi != null) {
+                    consent.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+                } else {
+                    prefs.driveConnected = true
+                    prefs.mode = CloudPrefs.MODE_DRIVE
+                    prefs.enabled = true
+                    tick++
+                }
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "Couldn't connect Google Drive: ${e.message}", Toast.LENGTH_LONG).show()
+            }
     }
 
     Column(
@@ -117,7 +167,7 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    if (enabled && folderPicked) Icons.Filled.CloudDone else Icons.Filled.Cloud,
+                    if (enabled && ready) Icons.Filled.CloudDone else Icons.Filled.Cloud,
                     contentDescription = null,
                     tint = palette.accent,
                     modifier = Modifier.size(24.dp)
@@ -125,9 +175,9 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Back up to Google Drive", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
+                Text("Back up recordings", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
                 Text(
-                    "Optional. No login \u2014 you pick a folder, the Drive app uploads.",
+                    "Optional. Google Drive or a folder of your choice.",
                     fontSize = 12.sp,
                     color = palette.textSecondary
                 )
@@ -135,13 +185,9 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
             androidx.compose.material3.Switch(
                 checked = enabled,
                 onCheckedChange = { on ->
-                    if (on && !folderPicked) {
-                        picker.launch(null)
-                    } else {
-                        prefs.enabled = on
-                        if (!on) CloudSync.cancelAll(context)
-                        tick++
-                    }
+                    prefs.enabled = on
+                    if (on) CloudSync.ensureSweepScheduled(context) else CloudSync.cancelAll(context)
+                    tick++
                 },
                 colors = androidx.compose.material3.SwitchDefaults.colors(
                     checkedThumbColor = palette.solidBackground,
@@ -156,15 +202,16 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
         AnimatedVisibility(visible = enabled) {
             Column {
                 Spacer(Modifier.height(14.dp))
-                if (!folderPicked) {
-                    PrimaryPill("Choose a Drive folder", palette) { picker.launch(null) }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "In the picker: open the \u2630 menu \u2192 Drive \u2192 make or open a folder \u2192 \u201CUse this folder\u201D.",
-                        fontSize = 12.sp,
-                        color = palette.textSecondary
-                    )
-                } else {
+                Text("How should recordings be saved?", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Spacer(Modifier.height(6.dp))
+                Segmented(
+                    listOf(CloudPrefs.MODE_DRIVE to "Google account", CloudPrefs.MODE_FOLDER to "Folder / File manager"),
+                    mode, palette
+                ) { prefs.mode = it; tick++ }
+                Spacer(Modifier.height(12.dp))
+
+                if (mode == CloudPrefs.MODE_DRIVE) {
+                    // ----------------------------------------------------------- Google account
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -173,41 +220,113 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.FolderOpen, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
+                        Icon(
+                            if (driveConnected) Icons.Filled.CloudDone else Icons.Filled.Cloud,
+                            contentDescription = null,
+                            tint = if (driveConnected) palette.callGreen else palette.accent,
+                            modifier = Modifier.size(22.dp)
+                        )
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
-                                prefs.folderName.ifBlank { "Selected folder" },
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = palette.textPrimary,
-                                maxLines = 1
+                                if (driveConnected) "Google Drive connected" else "Not connected",
+                                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary
                             )
                             Text(
-                                if (CloudSync.isFolderUsable(context)) "Ready" else "Can't reach this folder \u2014 choose it again",
-                                fontSize = 11.5.sp,
-                                color = if (CloudSync.isFolderUsable(context)) palette.callGreen else palette.danger
+                                "Saved in a folder called \u201CAshu Phone Recordings\u201D, named with the contact and date.",
+                                fontSize = 11.5.sp, color = palette.textSecondary
                             )
                         }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (!driveConnected) {
+                        PrimaryPill("Sign in with Google", palette) { connectDrive() }
+                    } else {
                         Text(
-                            "Change",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.accent,
-                            modifier = Modifier.bounceClick { picker.launch(null) }.padding(6.dp)
+                            "Disconnect",
+                            fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.danger,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable {
+                                    prefs.driveConnected = false
+                                    prefs.driveFolderId = null
+                                    CloudSync.cancelAll(context)
+                                    tick++
+                                }
+                                .padding(horizontal = 6.dp, vertical = 6.dp)
                         )
                     }
+                } else {
+                    // ----------------------------------------------------------- folder
+                    if (!folderPicked) {
+                        PrimaryPill("Choose a folder", palette) { picker.launch(null) }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "For Google Drive: in the picker open the \u2630 menu \u2192 Drive \u2192 make or open a folder \u2192 \u201CUse this folder\u201D. For your phone: choose any folder in Internal storage.",
+                            fontSize = 12.sp,
+                            color = palette.textSecondary
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(palette.accentSoft)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.FolderOpen, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    prefs.folderName.ifBlank { "Selected folder" },
+                                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1
+                                )
+                                val usable = CloudSync.folderIsUsableCached(context)
+                                Text(
+                                    when {
+                                        !usable -> "Can't reach this folder \u2014 choose it again"
+                                        kind == FolderKind.GOOGLE_DRIVE -> "\u2713 Google Drive folder"
+                                        kind == FolderKind.PHONE -> "\u26A0 This folder is on your PHONE, not in Google Drive"
+                                        else -> "\u2713 Cloud app folder"
+                                    },
+                                    fontSize = 11.5.sp,
+                                    color = when {
+                                        !usable -> palette.danger
+                                        kind == FolderKind.PHONE -> androidx.compose.ui.graphics.Color(0xFFE08A00)
+                                        else -> palette.callGreen
+                                    }
+                                )
+                            }
+                            Text(
+                                "Change",
+                                fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.accent,
+                                modifier = Modifier.bounceClick { picker.launch(null) }.padding(6.dp)
+                            )
+                        }
+                        if (kind == FolderKind.PHONE) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Files go to this folder in your File manager. They will NOT appear in Google Drive. To get them in Drive, choose a folder inside Drive, or switch to \u201CGoogle account\u201D above.",
+                                fontSize = 12.sp,
+                                color = androidx.compose.ui.graphics.Color(0xFFE08A00)
+                            )
+                        }
+                    }
+                }
+
+                if (ready) {
                     Spacer(Modifier.height(6.dp))
-                    SwitchRow("Back up new recordings automatically", "As soon as each call recording is saved", prefs.autoBackup, palette) {
+                    PrefSwitchRow("Back up new recordings automatically", "Right after each call recording is saved", prefs.autoBackup, palette) {
                         prefs.autoBackup = it; tick++
                     }
-                    SwitchRow("Wi\u2011Fi only", "Don't use mobile data for uploads", prefs.wifiOnly, palette) {
+                    PrefSwitchRow("Wi\u2011Fi only", "Don't use mobile data for uploads (not needed for phone folders)", prefs.wifiOnly, palette) {
                         prefs.wifiOnly = it; tick++
                     }
-                    SwitchRow("Only while charging", "Upload when the phone is plugged in", prefs.chargingOnly, palette) {
+                    PrefSwitchRow("Only while charging", "Upload when the phone is plugged in", prefs.chargingOnly, palette) {
                         prefs.chargingOnly = it; tick++
                     }
-                    SwitchRow(
+                    PrefSwitchRow(
                         "Keep recordings only in the cloud",
                         "After a successful upload the copy on this phone is deleted. Until then it waits in private app storage, never in Music.",
                         prefs.cloudOnly,
@@ -217,6 +336,7 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
                     Spacer(Modifier.height(8.dp))
                     val status = buildString {
                         if (pending > 0) append("$pending waiting to upload. ")
+                        if (waiting != null) append("$waiting. ")
                         if (prefs.lastSuccessAt > 0L) {
                             append("Last backup: ")
                             append(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(prefs.lastSuccessAt)))
@@ -242,15 +362,64 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
                             ).show()
                             tick++
                         }
-                        OutlinePill("Open folder", palette, Modifier.weight(1f)) {
+                        OutlinePill(if (busy) "Testing\u2026" else "Test backup", palette, Modifier.weight(1f)) {
+                            if (!busy) {
+                                busy = true
+                                testResult = null
+                                scope.launch {
+                                    val message = withContext(Dispatchers.IO) { CloudSync.testBackup(context) }
+                                    testResult = message
+                                    busy = false
+                                    tick++
+                                }
+                            }
+                        }
+                        OutlinePill("Open", palette, Modifier.weight(1f)) {
                             val intent = CloudSync.folderViewIntent(context)
                             try {
                                 if (intent != null) context.startActivity(intent)
                                 else Toast.makeText(context, "No folder chosen yet", Toast.LENGTH_SHORT).show()
                             } catch (_: Exception) {
-                                Toast.makeText(context, "Open the Google Drive app to see your folder", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Open your file manager or the Google Drive app to see the folder", Toast.LENGTH_SHORT).show()
                             }
                         }
+                    }
+                    testResult?.let { message ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            message,
+                            fontSize = 12.5.sp,
+                            color = palette.textPrimary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(palette.accentSoft)
+                                .padding(12.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    if (showGuide) "Hide the guide" else "How does backup work?",
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.accent,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { showGuide = !showGuide }.padding(vertical = 6.dp)
+                )
+                AnimatedVisibility(visible = showGuide) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(palette.accentSoft)
+                            .padding(12.dp)
+                    ) {
+                        listOf(
+                            "1. Pick how: \u201CGoogle account\u201D sends recordings straight to your Google Drive (easiest). \u201CFolder\u201D copies them to a folder you choose.",
+                            "2. For a Drive folder, choose it INSIDE the Drive app (\u2630 menu \u2192 Drive). A folder in Internal storage stays on your phone and will not show in Drive.",
+                            "3. Leave \u201CBack up new recordings automatically\u201D on. Each recording is copied right after the call. If there is no internet yet, it waits and tries again.",
+                            "4. Tap \u201CTest backup\u201D. It saves a small test file and tells you exactly where it went.",
+                            "5. Drive can take a minute to show new files in the app. Pull down to refresh."
+                        ).forEach { Text(it, fontSize = 12.5.sp, color = palette.textPrimary, modifier = Modifier.padding(vertical = 3.dp)) }
                     }
                 }
             }
@@ -272,7 +441,7 @@ fun RecordingExtrasCard(palette: DialerPalette, prefs: RecordingPrefs, modifier:
         Text("Smart extras", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
         Text("All optional", fontSize = 12.sp, color = palette.textSecondary)
         Spacer(Modifier.height(8.dp))
-        SwitchRow(
+        PrefSwitchRow(
             "\u201CMark moment\u201D button on the call screen",
             "Tap the flag during a call to bookmark an important moment. Jump to it later while listening.",
             showMark,

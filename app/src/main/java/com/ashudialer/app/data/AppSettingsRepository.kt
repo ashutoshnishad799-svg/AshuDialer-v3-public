@@ -146,7 +146,24 @@ data class AppSettings(
 
     // ---------------- v4 Recordings screen preferences (UI only - the recorder keeps its own prefs) ---
     val recordingsGroupByContact: Boolean = false,
-    val recordingsSort: String = "newest"
+    val recordingsSort: String = "newest",
+
+    // ---------------- v2.0.1 bottom bar, floating dialer and dialer layout ----------------------------
+    /** Bottom bar order, comma separated DialerTab names. */
+    val navOrder: String = "CONTACTS,RECENT,DIALER,PROTECT,MORE",
+    /** Keep the Dialer tab in the bottom bar (default). When off, the floating button is the way in. */
+    val navShowDialer: Boolean = true,
+    val navShowRecent: Boolean = true,
+    /** The round floating button above the bar: Dialer on Recents, Recents on the other tabs. */
+    val quickFab: Boolean = true,
+    /** Tapping Dialer opens a floating glass window instead of switching to the dialer page. */
+    val dialerFloating: Boolean = false,
+    /** Contact suggestions under the number go edge to edge and bigger. */
+    val dialerBoxWide: Boolean = false,
+    /** classic | compact | glass */
+    val dialerLayout: String = "classic",
+    /** auto | system | glass - see CallNotificationHelper.callStyleMode */
+    val callNotifStyle: String = "auto"
 )
 
 /** Keys of the generic Personalize / Recordings-UI preferences (stored as "p_<name>"). */
@@ -167,6 +184,14 @@ object PKey {
     const val STAGGER = "stagger"
     const val REC_GROUP = "rec_group_by_contact"
     const val REC_SORT = "rec_sort"
+    const val NAV_ORDER = "nav_order"
+    const val NAV_SHOW_DIALER = "nav_show_dialer"
+    const val NAV_SHOW_RECENT = "nav_show_recent"
+    const val QUICK_FAB = "quick_fab"
+    const val DIALER_FLOATING = "dialer_floating"
+    const val DIALER_WIDE = "dialer_wide"
+    const val DIALER_LAYOUT = "dialer_layout"
+    const val CALL_NOTIF = "call_notif"
 }
 
 /** Everything the person tuned in Personalize, as one object every screen can read via LocalAshuStyle. */
@@ -292,6 +317,14 @@ class AppSettingsRepository(private val context: Context) {
             staggerLists = prefs[pBool(PKey.STAGGER)] ?: true,
             recordingsGroupByContact = prefs[pBool(PKey.REC_GROUP)] ?: false,
             recordingsSort = prefs[pStr(PKey.REC_SORT)] ?: "newest",
+            navOrder = prefs[pStr(PKey.NAV_ORDER)] ?: "CONTACTS,RECENT,DIALER,PROTECT,MORE",
+            navShowDialer = prefs[pBool(PKey.NAV_SHOW_DIALER)] ?: true,
+            navShowRecent = prefs[pBool(PKey.NAV_SHOW_RECENT)] ?: true,
+            quickFab = prefs[pBool(PKey.QUICK_FAB)] ?: true,
+            dialerFloating = prefs[pBool(PKey.DIALER_FLOATING)] ?: false,
+            dialerBoxWide = prefs[pBool(PKey.DIALER_WIDE)] ?: false,
+            dialerLayout = prefs[pStr(PKey.DIALER_LAYOUT)] ?: "classic",
+            callNotifStyle = prefs[pStr(PKey.CALL_NOTIF)] ?: "auto",
         )
     }
 

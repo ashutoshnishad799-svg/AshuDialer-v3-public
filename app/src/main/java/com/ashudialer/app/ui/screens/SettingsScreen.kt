@@ -526,18 +526,53 @@ private fun TroubleshootingRows(
     fun state(ok: Boolean?, on: String = "On", off: String = "Off. Tap to fix", unknown: String = "Tap to check") =
         when (ok) { true -> on; false -> off; null -> unknown }
 
-    NavRow(Icons.Filled.Phone, "Phone and call access", state(hasPhone, on = "Allowed"), palette, onFixPermissions)
-    NavRow(Icons.Filled.Call, "Default dialer", state(isDefault, on = "Ashu Dialer is the default"), palette, onFixDefaultDialer)
-    NavRow(Icons.Filled.Lock, "Full screen calls", state(fullScreenOk, off = "Off. Turn on so a call can open over the lock screen"), palette) {
-        oem.openFullScreenIntentSettings(context)
+    // v2.0.1: show only what can actually need fixing on THIS phone.
+    //  - Phone access / default dialer: only when something is missing (they cannot be "fixed" when fine).
+    //  - Full screen calls: only where Android lets it be switched off (Android 14+) or on Xiaomi.
+    //  - Bluetooth headset audio: Android 12+.
+    //  - Battery, Autostart, lock-screen and the duplicate missed-call tip: Xiaomi / Redmi / POCO (MIUI, HyperOS) only,
+    //    because other ROMs (AOSP, Pixel, Samsung...) do not need them.
+    val fullScreenRelevant = android.os.Build.VERSION.SDK_INT >= 34 || miui
+    var anyRow = false
+    if (!hasPhone) {
+        anyRow = true
+        NavRow(Icons.Filled.Phone, "Phone and call access", state(hasPhone, on = "Allowed"), palette, onFixPermissions)
+    }
+    if (!isDefault) {
+        anyRow = true
+        NavRow(Icons.Filled.Call, "Default dialer", state(isDefault, on = "Ashu Dialer is the default"), palette, onFixDefaultDialer)
+    }
+    if (fullScreenRelevant) {
+        anyRow = true
+        NavRow(Icons.Filled.Lock, "Full screen calls", state(fullScreenOk, off = "Off. Turn on so a call can open over the lock screen"), palette) {
+            oem.openFullScreenIntentSettings(context)
+        }
+    }
+    if (needsBluetooth) {
+        anyRow = true
+        NavRow(Icons.Filled.Settings, "Bluetooth headset audio", state(bluetoothOk, on = "Allowed", off = "Off. Tap to allow"), palette, onRequestBluetooth)
     }
     if (miui) {
+        anyRow = true
         NavRow(Icons.Filled.Settings, "Xiaomi: Show on Lock screen", state(miuiLock), palette) { oem.openMiuiPermissionEditor(context) }
         NavRow(Icons.Filled.Settings, "Xiaomi: Open new windows while running in the background", state(miuiBg), palette) { oem.openMiuiPermissionEditor(context) }
         NavRow(Icons.Filled.Settings, "Xiaomi: Autostart", "Tap to check", palette) { oem.openMiuiAutostartSettings(context) }
+        NavRow(Icons.Filled.Build, "Battery: keep running in background", "Tap to check", palette) { oem.openAppBatterySettings(context) }
+        NavRow(
+            Icons.Filled.Settings,
+            "Two missed-call alerts?",
+            "The stock Phone app can add its own. Tap to turn its missed-call alerts off",
+            palette
+        ) {
+            if (!oem.openStockDialerNotificationSettings(context)) oem.openAppBatterySettings(context)
+        }
     }
-    if (needsBluetooth) {
-        NavRow(Icons.Filled.Settings, "Bluetooth headset audio", state(bluetoothOk, on = "Allowed", off = "Off. Tap to allow"), palette, onRequestBluetooth)
+    if (!anyRow) {
+        Text(
+            "Everything this phone needs is already set.",
+            fontSize = 13.sp,
+            color = palette.textSecondary,
+            modifier = Modifier.padding(16.dp)
+        )
     }
-    NavRow(Icons.Filled.Build, "Battery: keep running in background", "Tap to check", palette) { oem.openAppBatterySettings(context) }
 }

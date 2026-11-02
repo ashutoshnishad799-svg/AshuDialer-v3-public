@@ -17,15 +17,18 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import com.ashudialer.app.ui.theme.DialerPalette
 import com.ashudialer.app.ui.theme.LocalAshuStyle
@@ -36,13 +39,14 @@ import kotlin.math.sin
 /**
  * The light that lives behind every Liquid Glass surface.
  *
- * PERFORMANCE NOTE (why this looks the way it does): an earlier onboarding drew full-screen
- * Modifier.blur(150.dp) blobs and was visibly laggy on mid-range phones. This version never blurs
- * anything. Each "blob" is just a radial gradient that already fades to transparent, drawn with
- * plain Canvas calls, and the animation clock is read INSIDE the draw block, so only the draw phase
- * runs every frame - no recomposition. It also:
- *  - freezes into a still image when animation speed is "Off" or Android Battery Saver is on,
- *  - only moves very slowly (a full loop takes about 45 seconds), so the eye reads it as light, not motion.
+ * PERFORMANCE (rewritten for 2.0.1): the first version redrew four full-screen radial gradients on
+ * every frame, which is a lot of work for a mid-range GPU once dozens of translucent glass panes sit
+ * on top of it. Now the coloured blobs are drawn ONCE into a cached layer, and the "movement" is only
+ * the GPU sliding / slowly rotating that finished layer (graphicsLayer properties change, nothing is
+ * re-drawn or re-composed). Two layers move in opposite directions so it still looks like living light.
+ *
+ * It also never blurs anything, freezes when animation speed is "Off" or Battery Saver is on, and
+ * does not even start its animation clock in those cases.
  */
 @Composable
 fun AuroraBackground(
@@ -57,43 +61,79 @@ fun AuroraBackground(
         }.getOrDefault(false)
     }
     val animate = style.animationsOn && !saver
-    val colors = palette.auroraColors.ifEmpty {
-        listOf(palette.accent, palette.accentSoft, palette.accent)
+    val src = palette.auroraColors.ifEmpty { listOf(palette.accent, palette.accentSoft, palette.accent, palette.accentSoft) }
+    val strength = if (palette.isDark) 0.50f else 0.62f
+    val layerA = remember(src, strength) {
+        listOf(
+            Blob(0.20f, 0.14f, 0.62f, src[0 % src.size], strength),
+            Blob(0.88f, 0.40f, 0.58f, src[1 % src.size], strength * 0.9f)
+        )
+    }
+    val layerB = remember(src, strength) {
+        listOf(
+            Blob(0.30f, 0.84f, 0.66f, src[2 % src.size], strength * 0.85f),
+            Blob(0.80f, 0.94f, 0.50f, src[3 % src.size], strength * 0.7f)
+        )
     }
 
-    val transition = rememberInfiniteTransition(label = "aurora")
-    val clock by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(45_000, easing = LinearEasing)),
-        label = "aurora-clock"
-    )
-
-    Canvas(modifier.fillMaxSize()) {
-        drawRect(brush = palette.opaqueBackground)
-        val phase = if (animate) clock else 0.18f
-        val a = phase * 2f * PI.toFloat()
-        val w = size.width
-        val h = size.height
-        val strength = if (palette.isDark) 0.50f else 0.62f
-
-        fun blob(cx: Float, cy: Float, radiusFraction: Float, color: Color, alpha: Float) {
-            val r = radiusFraction * maxOf(w, h)
-            val center = Offset(cx * w, cy * h)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(color.copy(alpha = alpha), Color.Transparent),
-                    center = center,
-                    radius = r
-                ),
-                radius = r,
-                center = center
+    Box(modifier.fillMaxSize().background(palette.opaqueBackground)) {
+        if (animate) {
+            val transition = rememberInfiniteTransition(label = "aurora")
+            val clockA by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(38_000, easing = LinearEasing)),
+                label = "aurora-a"
             )
+            val clockB by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(53_000, easing = LinearEasing)),
+                label = "aurora-b"
+            )
+            AuroraLayer(layerA, phase = { clockA }, reverse = false)
+            AuroraLayer(layerB, phase = { clockB }, reverse = true)
+        } else {
+            AuroraLayer(layerA, phase = { 0.2f }, reverse = false)
+            AuroraLayer(layerB, phase = { 0.6f }, reverse = true)
         }
-
-        blob(0.18f + 0.14f * cos(a), 0.14f + 0.07f * sin(a), 0.62f, colors[0 % colors.size], strength)
-        blob(0.86f + 0.10f * sin(a * 1.0f + 1.3f), 0.38f + 0.10f * cos(a + 0.7f), 0.58f, colors[1 % colors.size], strength * 0.9f)
-        blob(0.30f + 0.12f * sin(a + 2.4f), 0.82f + 0.07f * cos(a + 1.1f), 0.66f, colors[2 % colors.size], strength * 0.85f)
-        blob(0.78f + 0.08f * cos(a + 3.2f), 0.92f - 0.06f * sin(a), 0.50f, colors[3 % colors.size], strength * 0.7f)
     }
+}
+
+private data class Blob(val cx: Float, val cy: Float, val radius: Float, val color: Color, val alpha: Float)
+
+@Composable
+private fun AuroraLayer(blobs: List<Blob>, phase: () -> Float, reverse: Boolean) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                // Read inside the layer block: only the layer is updated each frame, never recomposed.
+                val a = phase() * 2f * PI.toFloat() * (if (reverse) -1f else 1f)
+                translationX = size.width * 0.09f * cos(a)
+                translationY = size.height * 0.05f * sin(a)
+                rotationZ = 4f * sin(a)
+                scaleX = 1.22f
+                scaleY = 1.22f
+            }
+            .drawWithCache {
+                onDrawBehind {
+                    val w = size.width
+                    val h = size.height
+                    blobs.forEach { b ->
+                        val r = b.radius * maxOf(w, h)
+                        val center = Offset(b.cx * w, b.cy * h)
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(b.color.copy(alpha = b.alpha), Color.Transparent),
+                                center = center,
+                                radius = r
+                            ),
+                            radius = r,
+                            center = center
+                        )
+                    }
+                }
+            }
+    )
 }

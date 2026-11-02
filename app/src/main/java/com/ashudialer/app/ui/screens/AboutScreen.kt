@@ -58,14 +58,17 @@ import com.ashudialer.app.ui.theme.LocalDialerPalette
 private data class FeatureHighlight(val icon: ImageVector, val title: String, val description: String)
 
 private val whatsNew = listOf(
-    "New Recordings hub: waveform player, speed control, bookmarks, stars, tags and notes",
-    "Optional Google Drive backup through the Drive app (no login), with a cloud-only mode",
-    "Optional Liquid Glass and Frost Glass themes. White and Black stay the simple defaults",
-    "Personalize: accent colour, glass, corners, motion, haptics, bottom bar and dial pad style",
-    "Swipe a recent call: right to call, left to message",
-    "Redesigned onboarding and More screen",
-    "Fixed: crash when searching some number combinations in Recents",
-    "Fixed: the call notification timer started before the other person answered"
+    "Floating Dialer button: a round button above the bar opens a glass dialer window (Recents gets the same, from the other tabs)",
+    "Conference calls: Merge and Swap buttons, a proper \u201CConference call\u201D title, a Manage sheet with Hold, Private and Remove",
+    "Call notifications redesigned: labelled buttons, live timer, clearer missed-call alert, optional system call chip",
+    "Voicemail screen: per-SIM number you can edit, plus hold 1 on the dial pad",
+    "Google Drive backup: sign in with Google, or pick a folder; Test backup, plain-language guide and clear status",
+    "Personalize is now live: every slider changes the screen as you drag; rainbow colour slider; bottom bar order and visibility",
+    "Smoother everywhere: lighter glass drawing, cached aurora, faster Recordings list",
+    "Recordings of Private Space numbers hide themselves too",
+    "Dial pad layouts (Classic, Compact, Glass card) and wide contact suggestions",
+    "Troubleshooting only shows what your phone really needs (Xiaomi/HyperOS extras only on Xiaomi)",
+    "Fixed: Recents search crash, call timer before answer, stale Incoming-call notification, wrong name in multi-call"
 )
 
 private val featureHighlights = listOf(

@@ -10,6 +10,7 @@
  */
 package com.ashudialer.app.ui.theme
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -95,7 +96,7 @@ private fun fontScaleFor(index: Int): Float = when (index) {
  * v4: a custom accent colour (Personalize > Accent). Only the accent-derived colours change; every
  * theme keeps its own backgrounds, cards and text so contrast stays what the theme was tuned for.
  */
-private fun DialerPalette.withAccent(accent: Color?): DialerPalette {
+internal fun DialerPalette.withAccent(accent: Color?): DialerPalette {
     if (accent == null) return this
     return copy(
         accent = accent,
@@ -118,6 +119,7 @@ fun AshuDialerTheme(
     val palette = remember(basePalette, style.accentOverride) { basePalette.withAccent(style.accentOverride) }
     // Liquid Glass themes with the aurora switched on: the aurora is drawn once, behind EVERYTHING, and
     // every screen gets a transparent `background` so it shows through. Off / any other theme: untouched.
+    SyncSystemBars(palette)
     val glassAurora = palette.glass && style.aurora
     val shownPalette = if (glassAurora) palette.copy(background = SolidColor(Color.Transparent)) else palette
 
@@ -160,8 +162,50 @@ fun AshuDialerTheme(
                     content()
                 }
             } else {
-                content()
+                // v2.0.1: the theme's own background also fills the area BEHIND the status bar and gesture bar,
+                // so those strips always match the app (before, they showed a fixed window colour).
+                Box(Modifier.fillMaxSize().background(palette.opaqueBackground)) { content() }
             }
         }
+    }
+}
+
+/**
+ * Keeps the status bar and gesture bar icons in step with the app's own theme on every screen of every
+ * activity (not with the phone's light/dark setting), and tells MIUI / HyperOS the same thing - those
+ * ROMs keep their own "dark status bar" flag and otherwise ignore the standard one.
+ */
+@androidx.compose.runtime.Composable
+private fun SyncSystemBars(palette: DialerPalette) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (view.isInEditMode) return
+    androidx.compose.runtime.SideEffect {
+        var ctx: android.content.Context? = view.context
+        var window: android.view.Window? = null
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is android.app.Activity) {
+                window = ctx.window
+                break
+            }
+            ctx = ctx.baseContext
+        }
+        val w = window ?: return@SideEffect
+        val controller = androidx.core.view.WindowCompat.getInsetsController(w, view)
+        controller.isAppearanceLightStatusBars = !palette.isDark
+        controller.isAppearanceLightNavigationBars = !palette.isDark
+        setMiuiDarkStatusIcons(w, darkIcons = !palette.isDark)
+    }
+}
+
+private fun setMiuiDarkStatusIcons(window: android.view.Window, darkIcons: Boolean) {
+    try {
+        val flag = Class.forName("android.view.MiuiWindowManager\$LayoutParams")
+            .getField("EXTRA_FLAG_STATUS_BAR_DARK_MODE")
+            .getInt(null)
+        window.javaClass
+            .getMethod("setExtraFlags", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            .invoke(window, if (darkIcons) flag else 0, flag)
+    } catch (_: Throwable) {
+        // Not a MIUI / HyperOS phone (or the ROM hides it): the standard flags above are enough.
     }
 }

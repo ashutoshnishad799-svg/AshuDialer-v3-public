@@ -636,7 +636,7 @@ private fun NumberRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .combinedClickable(onClick = onCall, onLongClick = { showMenu = true })
-                .padding(vertical = 8.dp, horizontal = 8.dp),
+                .padding(vertical = com.ashudialer.app.ui.theme.LocalAshuStyle.current.rowPadding - 2.dp, horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {

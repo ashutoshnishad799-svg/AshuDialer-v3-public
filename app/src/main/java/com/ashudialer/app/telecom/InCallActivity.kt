@@ -282,6 +282,8 @@ class InCallActivity : ComponentActivity() {
             // timeout ran out - the "Connecting screen shows when I end a call" bug.
             var everHadCall by remember { mutableStateOf(call != null) }
             var hasSecondCall by remember { mutableStateOf(PixelInCallService.hasMultipleCalls) }
+            // v2.0.1: bumps whenever the service says anything about the calls changed (conference members, merge offers...)
+            var callTick by remember { mutableIntStateOf(0) }
             var canMergeCalls by remember { mutableStateOf(PixelInCallService.canMergeCalls()) }
             var canSwapCalls by remember { mutableStateOf(PixelInCallService.canSwapCalls()) }
             // Set the instant the person taps "End call", before Telecom's
@@ -418,6 +420,7 @@ class InCallActivity : ComponentActivity() {
                     hasSecondCall = PixelInCallService.hasMultipleCalls
                     canMergeCalls = PixelInCallService.canMergeCalls()
                     canSwapCalls = PixelInCallService.canSwapCalls()
+                    callTick++
                     // isMuted is no longer set here - it now comes solely
                     // from PixelInCallService.isMutedFlow (see above),
                     // which is driven by Telecom's own onCallAudioStateChanged.
@@ -455,6 +458,7 @@ class InCallActivity : ComponentActivity() {
                     hasSecondCall = PixelInCallService.hasMultipleCalls
                     canMergeCalls = PixelInCallService.canMergeCalls()
                     canSwapCalls = PixelInCallService.canSwapCalls()
+                    callTick++
                 }
             }
 
@@ -844,6 +848,28 @@ class InCallActivity : ComponentActivity() {
                         else -> null
                     }
                     val displayName = resolvedName ?: number
+                    // v2.0.1 conference: the people inside a merged call (empty for a normal call)
+                    val confMembers = remember(callTick, current, callState) { PixelInCallService.conferenceMembers(current) }
+                    val isConference = confMembers.isNotEmpty() ||
+                        current.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
+                    val confOwner = current.details?.can(Call.Details.CAPABILITY_MANAGE_CONFERENCE) == true ||
+                        current.details?.callDirection != Call.Details.DIRECTION_INCOMING
+                    val confParticipants by produceState(
+                        emptyList<com.ashudialer.app.ui.screens.ConferenceParticipantUi>(),
+                        confMembers.size,
+                        callTick
+                    ) {
+                        value = confMembers.map { m ->
+                            val n = m.details?.handle?.schemeSpecificPart.orEmpty()
+                            val saved = if (n.isNotBlank()) app.contactsRepository.lookupNameForNumber(n)?.displayName else null
+                            com.ashudialer.app.ui.screens.ConferenceParticipantUi(
+                                name = saved ?: m.details?.callerDisplayName?.takeIf { it.isNotBlank() } ?: n.ifBlank { "Participant" },
+                                number = n,
+                                canRemove = confOwner || m.details?.can(Call.Details.CAPABILITY_DISCONNECT_FROM_CONFERENCE) == true,
+                                canSplit = m.details?.can(Call.Details.CAPABILITY_SEPARATE_FROM_CONFERENCE) == true
+                            )
+                        }
+                    }
                     val secondary = PixelInCallService.secondaryCall
                     val secondaryNumber = secondary?.details?.handle?.schemeSpecificPart.orEmpty()
                     var secondarySaved by remember(secondaryNumber) { mutableStateOf<String?>(null) }
@@ -986,9 +1012,12 @@ class InCallActivity : ComponentActivity() {
                                 )
                             } else {
                             CallScreen(
-                                callerName = displayName,
-                                callerNumber = number,
-                                isSavedContact = isSavedContact,
+                                callerName = if (isConference) "Conference call" else displayName,
+                                callerNumber = if (isConference) "${confMembers.size.coerceAtLeast(2)} people" else number,
+                                isSavedContact = isSavedContact && !isConference,
+                                conferenceParticipants = if (isConference) confParticipants else emptyList(),
+                                onRemoveParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.removeFromConference(it) } },
+                                onSplitParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.splitFromConference(it) } },
                                 callerPhotoUri = localContactMatch?.photoUri,
                                 isConnected = callState == Call.STATE_ACTIVE,
                                 isOnHold = callState == Call.STATE_HOLDING,

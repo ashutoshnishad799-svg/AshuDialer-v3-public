@@ -116,6 +116,8 @@ dependencies {
     // retries with back-off) and DocumentFile writes into the folder picked in Android's file picker.
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    // optional "Google account" backup mode: sign-in + the Drive REST upload (same version the app module uses)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     // Real, published Maven Central coordinates - confirmed directly against
     // central.sonatype.com before use, matching what Ever-Dialer's own recorder module declares.

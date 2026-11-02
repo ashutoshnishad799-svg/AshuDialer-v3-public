@@ -31,6 +31,30 @@ import android.provider.Settings
  */
 object OemPermissionHelper {
 
+    /** The phone's own (stock) dialer app, if it is not this app. */
+    fun systemDialerPackage(context: Context): String? {
+        val tm = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+        val sys = runCatching { tm?.systemDialerPackage }.getOrNull()
+        if (!sys.isNullOrBlank() && sys != context.packageName) return sys
+        return listOf("com.android.contacts", "com.google.android.dialer", "com.android.dialer", "com.samsung.android.dialer")
+            .firstOrNull { pkg -> runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess }
+    }
+
+    /** Opens the notification settings of the stock dialer, to switch off its duplicate missed-call alerts. */
+    fun openStockDialerNotificationSettings(context: Context): Boolean {
+        val pkg = systemDialerPackage(context) ?: return false
+        return try {
+            context.startActivity(
+                android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, pkg)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun isLikelyMiui(): Boolean {
         return Build.MANUFACTURER.contains("xiaomi", ignoreCase = true) ||
             Build.BRAND.contains("xiaomi", ignoreCase = true) ||

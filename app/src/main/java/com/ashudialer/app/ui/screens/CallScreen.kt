@@ -94,6 +94,10 @@ fun CallScreen(
     secondaryCallerName: String? = null,
     secondaryCallerNumber: String? = null,
     secondaryCallState: Int? = null,
+    // v2.0.1 conference call: who is in it, and the owner's actions
+    conferenceParticipants: List<ConferenceParticipantUi> = emptyList(),
+    onRemoveParticipant: (Int) -> Unit = {},
+    onSplitParticipant: (Int) -> Unit = {},
     recordingAvailable: Boolean = false,
     isRecording: Boolean = false,
     // True for the window between tapping Record and the recorder actually
@@ -444,9 +448,54 @@ fun CallScreen(
                             fontSize = 15.sp, color = palette.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1
                         )
                     }
-                    if (canSwap) {
-                        Text("Swap", fontSize = 12.sp, color = palette.accent, fontWeight = FontWeight.Bold)
+                    if (canMerge) {
+                        CallActionPill("Merge", palette) { onMerge() }
+                        Spacer(Modifier.width(6.dp))
                     }
+                    if (canSwap) {
+                        CallActionPill("Swap", palette) { onSwap() }
+                    }
+                }
+            }
+
+            if (conferenceParticipants.isNotEmpty()) {
+                var showManage by remember { mutableStateOf(false) }
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(palette.cardBackground.copy(alpha = 0.55f))
+                        .border(1.dp, palette.cardBorder.copy(alpha = 0.65f), RoundedCornerShape(18.dp))
+                        .clickable { showManage = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Groups, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "${conferenceParticipants.size} people in this call",
+                            fontSize = 11.sp, color = palette.textSecondary, fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            conferenceParticipants.joinToString(", ") { it.name },
+                            fontSize = 15.sp, color = palette.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1
+                        )
+                    }
+                    Text("Manage", fontSize = 12.sp, color = palette.accent, fontWeight = FontWeight.Bold)
+                }
+                if (showManage) {
+                    ConferenceManageDialog(
+                        palette = palette,
+                        participants = conferenceParticipants,
+                        isOnHold = isOnHold,
+                        onToggleHold = onToggleHold,
+                        onRemove = onRemoveParticipant,
+                        onSplit = onSplitParticipant,
+                        onDismiss = { showManage = false }
+                    )
                 }
             }
 
@@ -1196,4 +1245,131 @@ private fun formatDuration(totalSeconds: Int): String {
     val m = totalSeconds / 60
     val s = totalSeconds % 60
     return "%02d:%02d".format(m, s)
+}
+
+/** One person inside a conference call, as the call screen shows them. */
+data class ConferenceParticipantUi(
+    val name: String,
+    val number: String,
+    val canRemove: Boolean,
+    val canSplit: Boolean
+)
+
+@Composable
+private fun CallActionPill(label: String, palette: DialerPalette, onClick: () -> Unit) {
+    Text(
+        text = label,
+        fontSize = 12.sp,
+        color = palette.accent,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(palette.accentSoft)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    )
+}
+
+/**
+ * Manage a conference: put the whole call on hold, talk to one person privately, or (for the person who
+ * started the conference) remove someone from it.
+ */
+@Composable
+private fun ConferenceManageDialog(
+    palette: DialerPalette,
+    participants: List<ConferenceParticipantUi>,
+    isOnHold: Boolean,
+    onToggleHold: () -> Unit,
+    onRemove: (Int) -> Unit,
+    onSplit: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(palette.cardBackground)
+                .border(1.dp, palette.cardBorder, RoundedCornerShape(28.dp))
+                .padding(18.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Groups, contentDescription = null, tint = palette.accent, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Conference call", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
+                    Text("${participants.size} people", fontSize = 12.5.sp, color = palette.textSecondary)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Text(
+                text = if (isOnHold) "Resume conference" else "Hold conference",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = palette.accent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(50))
+                    .background(palette.accentSoft)
+                    .clickable { onToggleHold() }
+                    .padding(vertical = 12.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(14.dp))
+            Text("PEOPLE", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = palette.textSecondary, letterSpacing = 0.8.sp)
+            Spacer(Modifier.height(6.dp))
+            participants.forEachIndexed { i, p ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(40.dp).clip(CircleShape).background(palette.accentSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            p.name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?",
+                            fontSize = 15.sp, fontWeight = FontWeight.Bold, color = palette.accent
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(p.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1)
+                        if (p.number.isNotBlank() && p.number != p.name) {
+                            Text(p.number, fontSize = 12.sp, color = palette.textSecondary, maxLines = 1)
+                        }
+                    }
+                    if (p.canSplit) {
+                        CallActionPill("Private", palette) { onSplit(i) }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    if (p.canRemove) {
+                        Text(
+                            "Remove",
+                            fontSize = 12.sp,
+                            color = palette.danger,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(palette.danger.copy(alpha = 0.14f))
+                                .clickable { onRemove(i) }
+                                .padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Done",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = palette.textSecondary,
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .clip(RoundedCornerShape(50))
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            )
+        }
+    }
 }

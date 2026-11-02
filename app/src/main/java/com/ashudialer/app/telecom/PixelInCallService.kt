@@ -127,31 +127,47 @@ class PixelInCallService : InCallService() {
          * mirrors what a normal dialer presents while keeping the other call
          * available as secondary/held context.
          */
+        // v2.0.1: the members of a conference are separate Call objects with a parent. They must never be
+        // picked as "the current call" - that is why a merged call used to show just one person's name.
+        private val topCalls: List<Call>
+            get() = _allCalls.filter { it.parent == null }
+
         val currentCall: Call?
-            get() = _allCalls.firstOrNull { it.state == Call.STATE_RINGING }
-                ?: _allCalls.firstOrNull { it.state == Call.STATE_DIALING }
-                ?: _allCalls.firstOrNull { it.state == Call.STATE_CONNECTING }
-                ?: _allCalls.firstOrNull { it.state == Call.STATE_ACTIVE }
-                ?: _allCalls.firstOrNull { it.state == Call.STATE_HOLDING }
+            get() = topCalls.firstOrNull { it.state == Call.STATE_RINGING }
+                ?: topCalls.firstOrNull { it.state == Call.STATE_DIALING }
+                ?: topCalls.firstOrNull { it.state == Call.STATE_CONNECTING }
+                ?: topCalls.firstOrNull { it.state == Call.STATE_ACTIVE }
+                ?: topCalls.firstOrNull { it.state == Call.STATE_HOLDING }
 
         val secondaryCall: Call?
-            get() = _allCalls.firstOrNull { it != currentCall && it.state != Call.STATE_DISCONNECTED }
+            get() = topCalls.firstOrNull { it != currentCall && it.state != Call.STATE_DISCONNECTED }
 
         val hasMultipleCalls: Boolean
-            get() = _allCalls.count { it.state != Call.STATE_DISCONNECTED } > 1
+            get() = topCalls.count { it.state != Call.STATE_DISCONNECTED } > 1
 
-        /** True only when Telecom currently exposes the pair as conferenceable. */
+        /** True when Telecom offers to join the two calls (either call can be the one that offers it). */
         fun canMergeCalls(): Boolean {
             val primary = currentCall ?: return false
             val secondary = secondaryCall ?: return false
             return try {
-                primary.state == Call.STATE_ACTIVE &&
-                    (secondary.state == Call.STATE_HOLDING || secondary.state == Call.STATE_ACTIVE) &&
-                    (primary.conferenceableCalls.contains(secondary) ||
-                        secondary.conferenceableCalls.contains(primary))
+                val settled = (primary.state == Call.STATE_ACTIVE || primary.state == Call.STATE_HOLDING) &&
+                    (secondary.state == Call.STATE_ACTIVE || secondary.state == Call.STATE_HOLDING)
+                settled && (
+                    primary.conferenceableCalls.contains(secondary) ||
+                        secondary.conferenceableCalls.contains(primary) ||
+                        primary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) ||
+                        secondary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE)
+                    )
             } catch (_: Throwable) {
                 false
             }
+        }
+
+        /** The people inside a conference call (empty for a normal call). */
+        fun conferenceMembers(call: Call?): List<Call> = try {
+            call?.children?.filter { it.state != Call.STATE_DISCONNECTED }.orEmpty()
+        } catch (_: Throwable) {
+            emptyList()
         }
 
         /** True for the standard ACTIVE + HOLDING two-call swap situation. */
@@ -194,7 +210,10 @@ class PixelInCallService : InCallService() {
         val app = applicationContext as? AshuDialerApp
         if (app != null) {
             serviceScope.launch {
-                app.appSettingsRepository.settingsFlow.collect { latestSettings = it }
+                app.appSettingsRepository.settingsFlow.collect {
+                    latestSettings = it
+                    CallNotificationHelper.callStyleMode = it.callNotifStyle
+                }
             }
         }
     }
@@ -294,6 +313,30 @@ class PixelInCallService : InCallService() {
                 handleMissedCallLogging(call)
                 call.unregisterCallback(this)
             }
+        }
+
+        // v2.0.1: these four used to be ignored, so the screen only noticed that two calls could be merged (or
+        // that a conference had formed) on the NEXT unrelated event - which felt like a long delay.
+        override fun onConferenceableCallsChanged(call: Call, conferenceableCalls: List<Call>) {
+            super.onConferenceableCallsChanged(call, conferenceableCalls)
+            notifyListeners()
+        }
+
+        override fun onChildrenChanged(call: Call, children: List<Call>) {
+            super.onChildrenChanged(call, children)
+            notifyListeners()
+            refreshNotificationFromCalls()
+        }
+
+        override fun onParentChanged(call: Call, parent: Call?) {
+            super.onParentChanged(call, parent)
+            notifyListeners()
+            refreshNotificationFromCalls()
+        }
+
+        override fun onDetailsChanged(call: Call, details: Call.Details) {
+            super.onDetailsChanged(call, details)
+            notifyListeners()
         }
 
         // DEEP FIX (native/VoLTE video calling - the incoming-upgrade
@@ -438,6 +481,8 @@ class PixelInCallService : InCallService() {
             _isMuted.value = false
             _nativeVideoUpgradeActive.value = false
             CallNotificationHelper.clear(applicationContext)
+        } else {
+            refreshNotificationFromCalls()
         }
         callKey(call)?.let {
             loggedAsMissed.remove(it)
@@ -475,10 +520,35 @@ class PixelInCallService : InCallService() {
         }
     }
 
+    /** Re-posts the notification for whichever call is in front right now. */
+    private fun refreshNotificationFromCalls() {
+        val top = currentCall ?: return
+        try {
+            handleStateForNotification(top, top.state)
+        } catch (e: Exception) {
+            Log.e(TAG, "Notification refresh failed", e)
+        }
+    }
+
+    /** "Conference call (3)" for a merged call, null for a normal call. */
+    private fun conferenceTitle(call: Call): String? {
+        val members = conferenceMembers(call)
+        val isConference = members.isNotEmpty() || call.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
+        if (!isConference) return null
+        return "Conference call (${members.size.coerceAtLeast(2)})"
+    }
+
     private fun handleStateForNotification(call: Call, state: Int) {
+        // v2.0.1: a conference member is never shown on its own, and only the call that is in front owns the
+        // notification - a held call changing state must not rename it (that was the "wrong name" bug).
+        if (call.parent != null) return
+        if (state != Call.STATE_DISCONNECTED) {
+            val top = currentCall
+            if (top != null && top !== call) return
+        }
         val number = call.details?.handle?.schemeSpecificPart ?: "Unknown"
         val carrierName = call.details?.callerDisplayName?.takeIf { it.isNotBlank() }
-        val name = nameForCall(number, carrierName)
+        val name = conferenceTitle(call) ?: nameForCall(number, carrierName)
         val isIncoming = call.details?.callDirection == Call.Details.DIRECTION_INCOMING
 
         startContactLookup(call, number)
@@ -509,12 +579,18 @@ class PixelInCallService : InCallService() {
                 )
             }
             Call.STATE_DISCONNECTED -> {
-                if (_allCalls.size <= 1) {
+                val stillLive = _allCalls.any { it !== call && it.parent == null && it.state != Call.STATE_DISCONNECTED }
+                if (!stillLive) {
                     if (latestSettings.keepCallsInNotifications) {
                         CallNotificationHelper.showCallEndedNotification(applicationContext, name)
                     } else {
                         CallNotificationHelper.clear(applicationContext)
                     }
+                } else {
+                    // Another call is still going (for example a call-waiting caller hung up): bring ITS
+                    // notification back instead of leaving a stale "Incoming call" alert on screen.
+                    val front = currentCall
+                    if (front != null && front !== call) handleStateForNotification(front, front.state)
                 }
             }
         }
@@ -802,16 +878,37 @@ class PixelInCallService : InCallService() {
     fun mergeCalls() {
         val primary = currentCall ?: return
         val secondary = secondaryCall ?: return
-        if (!canMergeCalls()) return
         try {
-            primary.conference(secondary)
+            when {
+                primary.conferenceableCalls.contains(secondary) -> primary.conference(secondary)
+                secondary.conferenceableCalls.contains(primary) -> secondary.conference(primary)
+                primary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) -> primary.mergeConference()
+                secondary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) -> secondary.mergeConference()
+                else -> Log.w(TAG, "Merge requested but Telecom does not offer it for this pair yet")
+            }
         } catch (e: Throwable) {
-            // Some carrier/OEM phone accounts advertise two calls but reject
-            // conference() until both calls have settled into ACTIVE. The UI
-            // already gates the action with conferenceableCalls; this catch
-            // prevents a carrier-specific TelecomException from crashing the
-            // in-call screen.
+            // Some carrier/OEM phone accounts advertise two calls but reject conference() for a moment.
+            // Catching keeps the in-call screen alive; the callbacks above re-enable the button the moment
+            // Telecom says the pair is conferenceable.
             Log.w(TAG, "Conference request rejected by Telecom", e)
+        }
+    }
+
+    /** Conference owner: drop one person from the conference (the rest stay connected). */
+    fun removeFromConference(member: Call) {
+        try {
+            member.disconnect()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not remove a participant", e)
+        }
+    }
+
+    /** Talk to one person privately; the rest of the conference is put on hold by the network. */
+    fun splitFromConference(member: Call) {
+        try {
+            member.splitFromConference()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not split a participant", e)
         }
     }
 }

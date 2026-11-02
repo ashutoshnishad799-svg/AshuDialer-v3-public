@@ -82,7 +82,7 @@ import com.ashudialer.app.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private enum class OverlayScreen { NONE, ACCOUNT, PRIVACY_POLICY, SETTINGS, BLOCKED_NUMBERS, REPORTED_SPAM, HELP_FEEDBACK, NOTES, RECORDINGS, RECORDING_GUIDE, RECORDING_SETTINGS, RECORDING_SETUP, RECORDING_APP_CALLS_SETUP, SIM_ROUTING, VIBRATION_PATTERNS, LOCAL_BACKUP, QUIET_HOURS, CALL_INSIGHTS, ABOUT, PRIVATE_SPACE, ADD_CONTACT, UPDATE_CHECK, INCOMING_CALL_STYLE, PERSONALIZE }
+private enum class OverlayScreen { NONE, ACCOUNT, PRIVACY_POLICY, SETTINGS, BLOCKED_NUMBERS, REPORTED_SPAM, HELP_FEEDBACK, NOTES, RECORDINGS, RECORDING_GUIDE, RECORDING_SETTINGS, RECORDING_SETUP, RECORDING_APP_CALLS_SETUP, SIM_ROUTING, VIBRATION_PATTERNS, LOCAL_BACKUP, QUIET_HOURS, CALL_INSIGHTS, ABOUT, PRIVATE_SPACE, ADD_CONTACT, UPDATE_CHECK, INCOMING_CALL_STYLE, PERSONALIZE, VOICEMAIL }
 
 // THE FIX for the Modules/Root-setup screen "freezing" after tapping
 // "Open Magisk" and coming back: overlay used to be plain `remember`,
@@ -447,6 +447,9 @@ class MainActivity : ComponentActivity() {
             val onboardingComplete by app.onboardingPreference.isCompleteFlow.collectAsState(initial = null)
             val scope = androidx.compose.runtime.rememberCoroutineScope()
             var selectedTab by launcherTabState
+            // v2.0.1 floating Dialer / Recents windows (opened from the round buttons above the bar)
+            var floatingDialerOpen by remember { mutableStateOf(false) }
+            var floatingRecentsOpen by remember { mutableStateOf(false) }
             var recordingGuideOpenedFromSettings by remember { mutableStateOf(false) }
             // Which screen opened the recording guide, so Back returns THERE. It used to always return to the
             // Recordings list, so tapping the (?) button on Recording settings and pressing Back dropped the person
@@ -908,6 +911,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // v2.0.1 Private Space: recordings of a locked number now hide themselves too - like that number's
+            // history and contact do. Whenever the recordings list or the locked numbers change, any recording
+            // whose caller matches a locked number is moved into Private Space (silently; if Private Space is
+            // not set up yet nothing happens).
+            val lockedForRecordings by viewModel.lockedNumbers.collectAsState()
+            LaunchedEffect(lockedForRecordings, recordings) {
+                if (!com.ashudialer.app.BuildConfig.CALL_RECORDING_ENABLED || lockedForRecordings.isEmpty()) return@LaunchedEffect
+                val toHide = recordings.filter { f ->
+                    val token = com.ashudialer.app.ui.screens.parseRecordingLabel(f.name).first
+                    val tokenDigits = token.filter { it.isDigit() }
+                    lockedForRecordings.any { l ->
+                        val lockedDigits = l.phoneNumber.filter { it.isDigit() }
+                        (tokenDigits.length >= 7 && lockedDigits.length >= 7 && tokenDigits.takeLast(10) == lockedDigits.takeLast(10)) ||
+                            (l.displayLabel.isNotBlank() && token.replace('_', ' ').trim().equals(l.displayLabel.trim(), ignoreCase = true))
+                    }
+                }
+                if (toHide.isNotEmpty()) {
+                    viewModel.moveRecordingsToPrivateSpace(context, toHide) { moved ->
+                        if (moved > 0) {
+                            recordings = com.ashudialer.app.telecom.CallRecorder.listRecordings(context)
+                            privateSpaceRecordingsRefreshToken += 1
+                        }
+                    }
+                }
+            }
+
             fun moveRecordingsToPrivateSpace(files: List<java.io.File>) {
                 if (!com.ashudialer.app.BuildConfig.CALL_RECORDING_ENABLED) return
                 viewModel.moveRecordingsToPrivateSpace(context, files) { moved ->
@@ -973,6 +1002,23 @@ class MainActivity : ComponentActivity() {
 
             AshuDialerTheme(themeId = themeId, fontSizeIndex = settings.fontSizeIndex, buttonDepth = settings.buttonDepth, style = settings.toAshuStyle()) {
                 val palette = LocalDialerPalette.current
+                // v2.0.1: Personalize > Animation speed drives every screen change below (0 = instant).
+                val motionStyle = com.ashudialer.app.ui.theme.LocalAshuStyle.current
+                // v2.0.1: the bottom bar's tabs, in the person's order, minus any they hid
+                val navTabs = remember(settings.navOrder, settings.navShowDialer, settings.navShowRecent) {
+                    com.ashudialer.app.ui.components.visibleNavTabs(settings.navOrder, settings.navShowDialer, settings.navShowRecent)
+                }
+                LaunchedEffect(navTabs, selectedTab) {
+                    if (selectedTab !in navTabs) {
+                        val wasDialer = selectedTab == DialerTab.DIALER
+                        selectedTab = navTabs.firstOrNull { it == DialerTab.RECENT } ?: navTabs.first()
+                        // The Dialer tab is hidden: whatever asked for it gets the floating dialer instead.
+                        if (wasDialer) floatingDialerOpen = true
+                    }
+                }
+                val openVoicemail: () -> Unit = {
+                    if (!com.ashudialer.app.telecom.VoicemailHelper.callQuick(context)) overlay = OverlayScreen.VOICEMAIL
+                }
                 val buttonHaptic = rememberButtonHaptic(settings.vibrateOnButtonPress)
 
                 // Status bar icon color follows the active theme's palette, not a
@@ -1157,7 +1203,21 @@ class MainActivity : ComponentActivity() {
                         containerColor = Color.Transparent,
                         bottomBar = {
                             if (overlay == OverlayScreen.NONE && callHistoryPageContact == null && selectedContactForDetail == null && unknownNumberForDetail == null) {
-                                DialerBottomNav(selected = selectedTab, onSelect = { selectedTab = it })
+                                DialerBottomNav(
+                                    selected = selectedTab,
+                                    tabs = navTabs,
+                                    onSelect = { tab ->
+                                        if (tab == DialerTab.DIALER && settings.dialerFloating) {
+                                            // Personalize > Dialer: open as a floating glass window instead of a page
+                                            floatingRecentsOpen = false
+                                            floatingDialerOpen = !floatingDialerOpen
+                                        } else {
+                                            floatingDialerOpen = false
+                                            floatingRecentsOpen = false
+                                            selectedTab = tab
+                                        }
+                                    }
+                                )
                             }
                         }
                     ) { padding ->
@@ -1220,16 +1280,16 @@ class MainActivity : ComponentActivity() {
                                 // one arrives from the right. Sliding along the bottom bar crosses several tabs, and each
                                 // switch plays this animation, so the page follows the finger.
                                 transitionSpec = {
-                                    val forward = targetState.ordinal > initialState.ordinal
+                                    val forward = navTabs.indexOf(targetState) > navTabs.indexOf(initialState)
                                     val distance = { fullWidth: Int -> fullWidth / 5 }
-                                    (fadeIn(tween(240)) +
+                                    (fadeIn(tween(motionStyle.ms(240))) +
                                         slideInHorizontally(
-                                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                                            animationSpec = tween(motionStyle.ms(280), easing = FastOutSlowInEasing),
                                             initialOffsetX = { w -> if (forward) distance(w) else -distance(w) }
                                         )) togetherWith
-                                        (fadeOut(tween(140)) +
+                                        (fadeOut(tween(motionStyle.ms(140))) +
                                             slideOutHorizontally(
-                                                animationSpec = tween(240, easing = FastOutSlowInEasing),
+                                                animationSpec = tween(motionStyle.ms(240), easing = FastOutSlowInEasing),
                                                 targetOffsetX = { w -> if (forward) -distance(w) else distance(w) }
                                             ))
                                 },
@@ -1334,6 +1394,9 @@ class MainActivity : ComponentActivity() {
                                         onAvatarClick = { contact -> selectedContactForDetail = contact },
                                         vibrateOnButtonPress = settings.vibrateOnButtonPress,
                                         lastCalledNumber = recents.firstOrNull()?.phoneNumber,
+                                        onVoicemail = openVoicemail,
+                                        layoutStyle = settings.dialerLayout,
+                                        wideSuggestions = settings.dialerBoxWide,
                                         modifier = Modifier.fillMaxSize()
                                     )
                                     DialerTab.PROTECT -> ProtectScreen(
@@ -1408,12 +1471,7 @@ class MainActivity : ComponentActivity() {
                                                     overlay = OverlayScreen.PRIVATE_SPACE
                                                 }
                                                 "Help & feedback" -> overlay = OverlayScreen.HELP_FEEDBACK
-                                                "Voicemail" -> {
-                                                    val started = DialerPermissions.callVoicemail(context)
-                                                    if (!started) {
-                                                        Toast.makeText(context, "Couldn't reach voicemail on this device", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
+                                                "Voicemail" -> overlay = OverlayScreen.VOICEMAIL
                                                 "About" -> overlay = OverlayScreen.ABOUT
                                             }
                                         },
@@ -1424,13 +1482,72 @@ class MainActivity : ComponentActivity() {
                             }
 
 
+                            // ---- v2.0.1 floating shortcut buttons and windows ------------------------------------------
+                            val noPageOpen = overlay == OverlayScreen.NONE && callHistoryPageContact == null &&
+                                selectedContactForDetail == null && unknownNumberForDetail == null
+                            val dialerReachableOnlyHere = !settings.navShowDialer
+                            val fabDialer = noPageOpen && selectedTab != DialerTab.DIALER &&
+                                ((settings.quickFab && selectedTab == DialerTab.RECENT) || dialerReachableOnlyHere)
+                            val fabRecents = noPageOpen && settings.quickFab &&
+                                selectedTab != DialerTab.RECENT && selectedTab != DialerTab.DIALER
+                            LaunchedEffect(overlay) {
+                                if (overlay != OverlayScreen.NONE) {
+                                    floatingDialerOpen = false
+                                    floatingRecentsOpen = false
+                                }
+                            }
+                            BackHandler(enabled = floatingDialerOpen || floatingRecentsOpen) {
+                                floatingDialerOpen = false
+                                floatingRecentsOpen = false
+                            }
+                            if (noPageOpen && (fabDialer || fabRecents || floatingDialerOpen || floatingRecentsOpen)) {
+                                com.ashudialer.app.ui.components.FloatingQuickAccess(
+                                    palette = palette,
+                                    showDialerFab = fabDialer || floatingDialerOpen,
+                                    showRecentsFab = fabRecents || floatingRecentsOpen,
+                                    dialerOpen = floatingDialerOpen,
+                                    recentsOpen = floatingRecentsOpen,
+                                    onToggleDialer = { floatingRecentsOpen = false; floatingDialerOpen = !floatingDialerOpen },
+                                    onToggleRecents = { floatingDialerOpen = false; floatingRecentsOpen = !floatingRecentsOpen },
+                                    onDismiss = { floatingDialerOpen = false; floatingRecentsOpen = false },
+                                    dialerContent = {
+                                        DialerScreen(
+                                            contacts = contacts,
+                                            onCall = { number -> buttonHaptic(); floatingDialerOpen = false; placeCall(number) },
+                                            onMessage = { number -> buttonHaptic(); floatingDialerOpen = false; sendMessage(number) },
+                                            onAddContact = { number ->
+                                                buttonHaptic()
+                                                floatingDialerOpen = false
+                                                dialerAddContactNumber = number
+                                                overlay = OverlayScreen.ADD_CONTACT
+                                            },
+                                            onAvatarClick = { contact -> floatingDialerOpen = false; selectedContactForDetail = contact },
+                                            vibrateOnButtonPress = settings.vibrateOnButtonPress,
+                                            lastCalledNumber = recents.firstOrNull()?.phoneNumber,
+                                            onVoicemail = { floatingDialerOpen = false; openVoicemail() },
+                                            layoutStyle = settings.dialerLayout,
+                                            wideSuggestions = settings.dialerBoxWide,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    },
+                                    recentsContent = {
+                                        com.ashudialer.app.ui.components.FloatingRecentsList(
+                                            palette = palette,
+                                            recents = recents,
+                                            onCall = { call -> buttonHaptic(); floatingRecentsOpen = false; placeCall(call.phoneNumber) },
+                                            onOpenAll = { floatingRecentsOpen = false; selectedTab = DialerTab.RECENT }
+                                        )
+                                    }
+                                )
+                            }
+
                             var renderedOverlay by remember { mutableStateOf(overlay) }
                             if (overlay != OverlayScreen.NONE) renderedOverlay = overlay
 
                             AnimatedVisibility(
                                 visible = overlay != OverlayScreen.NONE,
-                                enter = slideInHorizontally { it } + fadeIn(),
-                                exit = slideOutHorizontally { it } + fadeOut()
+                                enter = slideInHorizontally(tween(motionStyle.ms(300), easing = FastOutSlowInEasing)) { it } + fadeIn(tween(motionStyle.ms(220))),
+                                exit = slideOutHorizontally(tween(motionStyle.ms(240), easing = FastOutSlowInEasing)) { it } + fadeOut(tween(motionStyle.ms(180)))
                             ) {
                                 Box(modifier = Modifier.fillMaxSize().background(palette.opaqueBackground)) {
                                     // v4: glass themes keep their moving light on overlay screens too.
@@ -1449,8 +1566,8 @@ class MainActivity : ComponentActivity() {
                                     androidx.compose.animation.AnimatedContent(
                                         targetState = renderedOverlay,
                                         transitionSpec = {
-                                            (slideInHorizontally { width -> width / 3 } + fadeIn()) togetherWith
-                                                (slideOutHorizontally { width -> -width / 3 } + fadeOut())
+                                            (slideInHorizontally(tween(motionStyle.ms(280), easing = FastOutSlowInEasing)) { width -> width / 3 } + fadeIn(tween(motionStyle.ms(220)))) togetherWith
+                                                (slideOutHorizontally(tween(motionStyle.ms(240), easing = FastOutSlowInEasing)) { width -> -width / 3 } + fadeOut(tween(motionStyle.ms(180))))
                                         },
                                         label = "overlayScreenTransition"
                                     ) { targetOverlay ->
@@ -1729,7 +1846,7 @@ class MainActivity : ComponentActivity() {
                                                 overlay = OverlayScreen.UPDATE_CHECK
                                             },
                                             onOpenTelegramChannel = {
-                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/ashuapps_07x")).apply {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/ashuapks_07x")).apply {
                                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                                 }
                                                 try {
@@ -2072,6 +2189,10 @@ class MainActivity : ComponentActivity() {
                                             onBack = { overlay = OverlayScreen.NONE },
                                             modifier = Modifier.fillMaxSize()
                                         )
+                                        OverlayScreen.VOICEMAIL -> com.ashudialer.app.ui.screens.VoicemailScreen(
+                                            onBack = { overlay = OverlayScreen.NONE },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                         OverlayScreen.NONE -> {}
                                     }
                                     }
@@ -2081,11 +2202,11 @@ class MainActivity : ComponentActivity() {
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = selectedContactForDetail != null,
                                 enter = androidx.compose.animation.slideInVertically(
-                                    animationSpec = androidx.compose.animation.core.tween(280)
-                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(280)),
+                                    animationSpec = androidx.compose.animation.core.tween(motionStyle.ms(280))
+                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(motionStyle.ms(280))),
                                 exit = androidx.compose.animation.slideOutVertically(
-                                    animationSpec = androidx.compose.animation.core.tween(220)
-                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(220))
+                                    animationSpec = androidx.compose.animation.core.tween(motionStyle.ms(220))
+                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(motionStyle.ms(220)))
                             ) {
                                 // Re-derive from the live `contacts` list by id rather than
                                 // using the frozen snapshot directly. selectedContactForDetail
@@ -2235,11 +2356,11 @@ class MainActivity : ComponentActivity() {
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = callHistoryPageContact != null,
                                 enter = androidx.compose.animation.slideInHorizontally(
-                                    animationSpec = androidx.compose.animation.core.tween(260)
-                                ) { fullWidth -> fullWidth / 3 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)),
+                                    animationSpec = androidx.compose.animation.core.tween(motionStyle.ms(260))
+                                ) { fullWidth -> fullWidth / 3 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(motionStyle.ms(220))),
                                 exit = androidx.compose.animation.slideOutHorizontally(
-                                    animationSpec = androidx.compose.animation.core.tween(220)
-                                ) { fullWidth -> fullWidth / 3 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180))
+                                    animationSpec = androidx.compose.animation.core.tween(motionStyle.ms(220))
+                                ) { fullWidth -> fullWidth / 3 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(motionStyle.ms(180)))
                             ) {
                                 val contact = callHistoryPageContact
                                 if (contact != null) {
@@ -2263,11 +2384,11 @@ class MainActivity : ComponentActivity() {
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = unknownNumberForDetail != null,
                                 enter = androidx.compose.animation.slideInVertically(
-                                    animationSpec = androidx.compose.animation.core.tween(280)
-                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(280)),
+                                    animationSpec = androidx.compose.animation.core.tween(motionStyle.ms(280))
+                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(motionStyle.ms(280))),
                                 exit = androidx.compose.animation.slideOutVertically(
-                                    animationSpec = androidx.compose.animation.core.tween(220)
-                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(220))
+                                    animationSpec = androidx.compose.animation.core.tween(motionStyle.ms(220))
+                                ) { fullHeight -> fullHeight / 4 } + androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(motionStyle.ms(220)))
                             ) {
                                 val number = unknownNumberForDetail
                                 if (number != null) {

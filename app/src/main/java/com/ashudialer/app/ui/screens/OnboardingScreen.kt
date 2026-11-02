@@ -10,7 +10,10 @@
  */
 package com.ashudialer.app.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -27,7 +30,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,12 +50,14 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -65,7 +73,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -133,7 +144,7 @@ fun OnboardingScreen(
     val bodies = remember {
         listOf(
             "A fast, private dialer with the tools power users actually want.",
-            "Smart search, swipe actions and a dial pad that feels alive.",
+            "Smart search finds people as you type. Swipe a recent call to call back or message.",
             "Optional. Auto-record, mark key moments, add notes and back up to Google Drive when you choose.",
             "Block spam, hide numbers in Private Space and silence calls with Quiet Hours.",
             "White and Black are the defaults. Dozens of optional looks, including Liquid Glass, live in Personalize."
@@ -165,7 +176,10 @@ fun OnboardingScreen(
         Column(Modifier.fillMaxSize()) {
             // top row: skip
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.End
             ) {
                 val last = pagerState.currentPage == pageCount - 1
@@ -177,7 +191,7 @@ fun OnboardingScreen(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .then(if (last) Modifier else Modifier.bounceClick { onFinished() })
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .padding(horizontal = 18.dp, vertical = 12.dp)
                 )
             }
 
@@ -202,7 +216,7 @@ fun OnboardingScreen(
                     ) {
                         when (page) {
                             0 -> WelcomeArt(pageColors[0], palette)
-                            1 -> KeypadArt(pageColors[1], palette)
+                            1 -> SmartSearchArt(pageColors[1], palette)
                             2 -> RecordArt(pageColors[2], palette)
                             3 -> ShieldArt(pageColors[3], palette)
                             else -> ThemeArt(currentThemeId, onThemeSelected, palette)
@@ -241,7 +255,10 @@ fun OnboardingScreen(
 
             // indicator + primary button
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -287,119 +304,210 @@ fun OnboardingScreen(
 }
 
 // ------------------------------------------------------------------------------------------------
-//  Page 1 - Welcome
+//  Page 1 - Welcome: a glass app tile with a slow light sweep and soft echoes
 // ------------------------------------------------------------------------------------------------
 
 @Composable
 private fun WelcomeArt(color: Color, palette: DialerPalette) {
     val style = LocalAshuStyle.current
+    val on = style.animationsOn
     val transition = rememberInfiniteTransition(label = "welcome")
-    val phase by transition.animateFloat(
+    val ripple by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(style.ms(3600).coerceAtLeast(600), easing = LinearEasing)),
-        label = "welcome-phase"
+        animationSpec = infiniteRepeatable(tween(style.ms(4200).coerceAtLeast(900), easing = LinearEasing)),
+        label = "welcome-ripple"
     )
-    Box(Modifier.size(280.dp), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val maxR = size.minDimension / 2f
-            for (i in 0 until 3) {
-                val p = if (style.animationsOn) (phase + i / 3f) % 1f else 0.25f + i * 0.28f
-                val r = maxR * (0.36f + 0.64f * p)
-                drawCircle(
-                    color = color.copy(alpha = (1f - p) * 0.38f),
-                    radius = r,
-                    center = center,
-                    style = Stroke(width = 2.dp.toPx())
-                )
-            }
-            drawCircle(
-                brush = Brush.radialGradient(listOf(color.copy(alpha = 0.32f), Color.Transparent), center = center, radius = maxR * 0.55f),
-                radius = maxR * 0.55f,
-                center = center
+    val sweep by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(style.ms(3800).coerceAtLeast(900), easing = LinearEasing)),
+        label = "welcome-sweep"
+    )
+    val breathe by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(style.ms(5200).coerceAtLeast(900), easing = LinearEasing), RepeatMode.Reverse),
+        label = "welcome-breathe"
+    )
+    Box(Modifier.size(300.dp), contentAlignment = Alignment.Center) {
+        // slow breathing light under the tile
+        Box(
+            Modifier
+                .size(260.dp)
+                .graphicsLayer {
+                    val s = if (on) 0.92f + 0.16f * breathe else 1f
+                    scaleX = s
+                    scaleY = s
+                    alpha = if (on) 0.55f + 0.35f * breathe else 0.7f
+                }
+                .background(Brush.radialGradient(listOf(color.copy(alpha = 0.42f), Color.Transparent)))
+        )
+        // two soft echoes of the tile spreading outward
+        repeat(2) { i ->
+            Box(
+                Modifier
+                    .size(132.dp)
+                    .graphicsLayer {
+                        val p = if (on) (ripple + i * 0.5f) % 1f else 0.25f + 0.4f * i
+                        val s = 1f + 0.7f * p
+                        scaleX = s
+                        scaleY = s
+                        alpha = (1f - p) * 0.30f
+                    }
+                    .border(1.5.dp, color, RoundedCornerShape(40.dp))
             )
         }
+        // the glass tile
         Box(
-            modifier = Modifier.size(116.dp).liquidGlass(palette, CircleShape, tintAlpha = 0.85f),
+            modifier = Modifier.size(132.dp).liquidGlass(palette, RoundedCornerShape(40.dp), tintAlpha = 0.85f),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Filled.Call, contentDescription = null, tint = color, modifier = Modifier.size(54.dp))
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.45f)
+                    .align(Alignment.CenterStart)
+                    .graphicsLayer {
+                        translationX = (if (on) sweep * 2.6f - 0.6f else 0.4f) * size.width
+                        rotationZ = 14f
+                    }
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, Color.White.copy(alpha = if (palette.isDark) 0.16f else 0.40f), Color.Transparent)
+                        )
+                    )
+            )
+            Icon(Icons.Filled.Call, contentDescription = null, tint = color, modifier = Modifier.size(58.dp))
         }
     }
 }
 
 // ------------------------------------------------------------------------------------------------
-//  Page 2 - a dial pad that types by itself
+//  Page 2 - smart search that types by itself, and a recent call that swipes
 // ------------------------------------------------------------------------------------------------
 
 @Composable
-private fun KeypadArt(color: Color, palette: DialerPalette) {
+private fun SmartSearchArt(color: Color, palette: DialerPalette) {
     val style = LocalAshuStyle.current
-    val sequence = remember { listOf("9", "8", "7", "6", "5", "4", "3", "2", "1", "0") }
-    var step by remember { mutableIntStateOf(if (style.animationsOn) 0 else 6) }
-    LaunchedEffect(style.animationsOn) {
-        if (style.animationsOn) {
+    val on = style.animationsOn
+    val people = remember {
+        listOf(
+            Triple("Aarav Sharma", "Mobile \u2022 98765 43210", "AS"),
+            Triple("Aarti Verma", "Mobile \u2022 98123 45670", "AV"),
+            Triple("Aaryan Patel", "Mobile \u2022 99887 76655", "AP")
+        )
+    }
+    var typed by remember { mutableStateOf(if (on) "" else "Aar") }
+    LaunchedEffect(on) {
+        if (on) {
             while (true) {
-                delay(style.ms(520).toLong().coerceAtLeast(120L))
-                step = (step + 1) % (sequence.size + 3)
+                typed = ""
+                delay(600)
+                for (i in 1..5) {
+                    typed = "Aarav".take(i)
+                    delay(style.ms(260).toLong().coerceAtLeast(60L))
+                }
+                delay(2800)
             }
         }
     }
-    val typed = sequence.take(step.coerceAtMost(sequence.size)).joinToString("")
-    val active = if (step in 1..sequence.size) sequence[step - 1] else null
-    val shown = if (typed.length > 5) typed.substring(0, 5) + " " + typed.substring(5) else typed
+    val swipe = remember { Animatable(0f) }
+    LaunchedEffect(on) {
+        if (on) {
+            while (true) {
+                delay(3600)
+                swipe.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
+                delay(500)
+                swipe.animateTo(0f, spring(dampingRatio = 0.72f))
+                delay(2600)
+            }
+        }
+    }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
+    Column(Modifier.fillMaxWidth(0.92f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
             modifier = Modifier
-                .fillMaxWidth(0.82f)
-                .height(58.dp)
-                .liquidGlass(palette, RoundedCornerShape(20.dp)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .liquidGlass(palette, RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
             Text(
-                if (shown.isEmpty()) "\u2009" else shown,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 2.sp,
-                color = palette.textPrimary
+                if (typed.isEmpty()) "Search contacts or numbers" else typed,
+                fontSize = 16.sp,
+                color = if (typed.isEmpty()) palette.textSecondary else palette.textPrimary,
+                maxLines = 1
             )
         }
-        Spacer(Modifier.height(16.dp))
-        val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("*", "0", "#"))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            rows.forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { key ->
-                        val on = key == active
-                        val bg by animateColorAsState(if (on) color else Color.Transparent, tween(160), label = "key-bg")
-                        val scale by androidx.compose.animation.core.animateFloatAsState(
-                            if (on) 1.14f else 1f,
-                            spring(dampingRatio = 0.45f),
-                            label = "key-scale"
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(58.dp)
-                                .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                }
-                                .liquidGlass(palette, CircleShape)
-                                .background(bg, CircleShape),
-                            contentAlignment = Alignment.Center
+        Spacer(Modifier.height(12.dp))
+        Column(Modifier.fillMaxWidth().liquidGlass(palette, RoundedCornerShape(24.dp))) {
+            people.forEachIndexed { i, (name, sub, initials) ->
+                val match = typed.isEmpty() || name.startsWith(typed, ignoreCase = true)
+                val rowAlpha by androidx.compose.animation.core.animateFloatAsState(
+                    if (match) 1f else 0.32f, tween(220), label = "row-alpha"
+                )
+                Box(Modifier.fillMaxWidth().graphicsLayer { alpha = rowAlpha }) {
+                    if (i == 0) {
+                        Row(
+                            Modifier
+                                .matchParentSize()
+                                .background(palette.callGreen.copy(alpha = 0.85f * swipe.value))
+                                .padding(start = 22.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                key,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (on) Color.White else palette.textPrimary
-                            )
+                            Icon(Icons.Filled.Call, contentDescription = null, tint = Color.White.copy(alpha = swipe.value), modifier = Modifier.size(24.dp))
                         }
                     }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer { if (i == 0) translationX = swipe.value * size.width * 0.34f }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier.size(42.dp).clip(CircleShape).background(palette.accentSoft),
+                            contentAlignment = Alignment.Center
+                        ) { Text(initials, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = palette.accent) }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                buildAnnotatedString {
+                                    if (match && typed.isNotEmpty()) {
+                                        withStyle(SpanStyle(color = color, fontWeight = FontWeight.Bold)) { append(name.take(typed.length)) }
+                                        append(name.drop(typed.length))
+                                    } else {
+                                        append(name)
+                                    }
+                                },
+                                fontSize = 15.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = palette.textPrimary,
+                                maxLines = 1
+                            )
+                            Text(sub, fontSize = 12.5.sp, color = palette.textSecondary, maxLines = 1)
+                        }
+                        Box(
+                            Modifier.size(38.dp).clip(CircleShape).background(palette.callGreen.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Filled.Call, contentDescription = null, tint = palette.callGreen, modifier = Modifier.size(19.dp)) }
+                    }
+                }
+                if (i < people.lastIndex) {
+                    Box(Modifier.fillMaxWidth().padding(start = 68.dp).height(1.dp).background(palette.cardBorder.copy(alpha = 0.5f)))
                 }
             }
         }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Swipe a recent call: right to call, left to message",
+            fontSize = 12.sp,
+            color = palette.textSecondary,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -546,7 +654,7 @@ private fun ShieldArt(color: Color, palette: DialerPalette) {
         }
         Spacer(Modifier.height(16.dp))
         val items = listOf("Spam blocked", "Private Space", "Quiet Hours")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             items.forEachIndexed { i, label ->
                 val reveal = if (style.animationsOn) ((sweep * 3.2f) - i).coerceIn(0f, 1f) else 1f
                 Row(
@@ -556,12 +664,12 @@ private fun ShieldArt(color: Color, palette: DialerPalette) {
                             translationY = (1f - reveal) * 8.dp.toPx()
                         }
                         .liquidGlass(palette, RoundedCornerShape(50))
-                        .padding(horizontal = 11.dp, vertical = 7.dp),
+                        .padding(horizontal = 9.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Check, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1, softWrap = false)
                 }
             }
         }

@@ -40,7 +40,7 @@ private data class FaqItem(val question: String, val answer: String)
 
 private const val INSTAGRAM_USER = "ashutosh_07x"
 private const val TELEGRAM_USER = "ashutosh_07x"
-private const val TELEGRAM_CHANNEL = "ashuapps_07x"
+private const val TELEGRAM_CHANNEL = "ashuapks_07x"
 
 /**
  * Opens [webUrl] in the dedicated app when possible ([appPackage] + [appUri]),

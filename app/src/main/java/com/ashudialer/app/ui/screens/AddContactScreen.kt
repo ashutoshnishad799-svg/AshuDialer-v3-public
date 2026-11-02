@@ -321,9 +321,11 @@ fun AddContactScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .glassCard(palette, corner = 0.dp, tintAlpha = 0.85f)
-                .padding(horizontal = 20.dp, vertical = 16.dp)
                 .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                // v2.0.1: a floating rounded bar instead of a full-width rectangle
+                .glassCard(palette, corner = 30.dp, tintAlpha = 0.9f)
+                .padding(10.dp)
         ) {
             Button(
                 onClick = {
@@ -337,7 +339,7 @@ fun AddContactScreen(
                 },
                 enabled = canSave,
                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = palette.accent)
             ) {
                 Icon(Icons.Filled.Check, null, Modifier.size(19.dp))

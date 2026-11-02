@@ -93,9 +93,9 @@ fun Modifier.bounceClick(
 @Composable
 fun Modifier.staggerIn(
     index: Int,
-    stepMs: Int = 45,
-    maxStaggered: Int = 9,
-    distance: Dp = 18.dp
+    stepMs: Int = 32,
+    maxStaggered: Int = 6,
+    distance: Dp = 14.dp
 ): Modifier {
     val style = LocalAshuStyle.current
     if (!style.animationsOn || !style.staggerLists) return this
@@ -106,7 +106,7 @@ fun Modifier.staggerIn(
     }
     val progress by animateFloatAsState(
         targetValue = if (shown) 1f else 0f,
-        animationSpec = tween(style.ms(380)),
+        animationSpec = tween(style.ms(280)),
         label = "stagger"
     )
     return this.graphicsLayer {
