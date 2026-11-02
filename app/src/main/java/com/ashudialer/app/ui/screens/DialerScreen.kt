@@ -55,6 +55,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.roundToPx
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -189,6 +191,14 @@ fun DialerScreen(
      * middle of a pasted or edited number inserts where the cursor actually
      * is, matching how every other text field on the device behaves.
      */
+    fun insertAtCursor(text: String) {
+        val start = numberField.selection.start.coerceIn(0, numberField.text.length)
+        val end = numberField.selection.end.coerceIn(0, numberField.text.length)
+        val newText = numberField.text.replaceRange(start, end, text)
+        val newCursor = start + text.length
+        numberField = TextFieldValue(newText, TextRange(newCursor))
+    }
+
     /** Replaces the character just before the cursor (used when a long-press turns a typed digit into something else). */
     fun replaceLastCharWith(text: String) {
         val pos = numberField.selection.start.coerceIn(0, numberField.text.length)
@@ -196,14 +206,6 @@ fun DialerScreen(
             numberField = TextFieldValue(numberField.text.removeRange(pos - 1, pos), TextRange(pos - 1))
         }
         if (text.isNotEmpty()) insertAtCursor(text)
-    }
-
-    fun insertAtCursor(text: String) {
-        val start = numberField.selection.start.coerceIn(0, numberField.text.length)
-        val end = numberField.selection.end.coerceIn(0, numberField.text.length)
-        val newText = numberField.text.replaceRange(start, end, text)
-        val newCursor = start + text.length
-        numberField = TextFieldValue(newText, TextRange(newCursor))
     }
 
     // A visible one-tap Paste pill, separate from the system's own

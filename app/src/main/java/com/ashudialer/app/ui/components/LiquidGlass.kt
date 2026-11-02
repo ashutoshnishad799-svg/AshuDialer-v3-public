@@ -28,9 +28,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawOutline
+import androidx.compose.ui.graphics.drawscope.drawPath
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -102,16 +103,23 @@ fun Modifier.liquidGlass(
         .clip(shp)
         .drawWithCache {
             val outline = shp.createOutline(size, layoutDirection, this)
+            val outlinePath = Path().apply {
+                when (outline) {
+                    is Outline.Rectangle -> addRect(outline.rect)
+                    is Outline.Rounded -> addRoundRect(outline.roundRect)
+                    is Outline.Generic -> addPath(outline.path)
+                }
+            }
             // A stroke is centred on the edge and the clip removes the outer half, so the visible
             // width is half of what is passed here.
             val rimWidth = 2f * look.rimDp * density
             val hairWidth = 1f * density
             onDrawBehind {
-                look.fillColor?.let { drawOutline(outline, it) }
-                look.fillBrush?.let { drawOutline(outline, it) }
-                look.sheen?.let { drawOutline(outline, it) }
-                drawOutline(outline, look.rim, style = Stroke(width = rimWidth))
-                look.hairline?.let { drawOutline(outline, it, style = Stroke(width = hairWidth)) }
+                look.fillColor?.let { drawPath(outlinePath, color = it) }
+                look.fillBrush?.let { drawPath(outlinePath, brush = it) }
+                look.sheen?.let { drawPath(outlinePath, brush = it) }
+                drawPath(outlinePath, brush = look.rim, style = Stroke(width = rimWidth))
+                look.hairline?.let { drawPath(outlinePath, color = it, style = Stroke(width = hairWidth)) }
             }
         }
 }
