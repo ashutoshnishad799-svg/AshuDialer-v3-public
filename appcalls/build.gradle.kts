@@ -106,16 +106,16 @@ tasks.matching { it.name.startsWith("merge") && it.name.contains("Assets") }.con
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.annotation:annotation:1.8.2")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.annotation:annotation:1.11.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // v4 optional cloud backup: WorkManager runs the uploads (survives app close, waits for Wi-Fi,
     // retries with back-off) and DocumentFile writes into the folder picked in Android's file picker.
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
+    implementation("androidx.documentfile:documentfile:1.1.0")
     // optional "Google account" backup mode: sign-in + the Drive REST upload (same version the app module uses)
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 
