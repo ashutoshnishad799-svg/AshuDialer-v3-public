@@ -111,7 +111,7 @@ fun FloatingQuickAccess(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(palette.solidBackground.copy(alpha = 0.90f))
+                    .background(palette.solidBackground.copy(alpha = 0.84f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -129,7 +129,7 @@ fun FloatingQuickAccess(
                 fadeOut(tween(style.ms(140))),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            FloatingWindowFrame(palette, heightFraction = 0.82f, bottomGap = if (showRecentsFab && showDialerFab) 150.dp else 90.dp) {
+            FloatingWindowFrame(palette, heightFraction = 0.75f, bottomGap = if (showRecentsFab && showDialerFab) 132.dp else 78.dp) {
                 dialerContent()
             }
         }
@@ -143,7 +143,7 @@ fun FloatingQuickAccess(
                 fadeOut(tween(style.ms(140))),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            FloatingWindowFrame(palette, heightFraction = 0.66f, bottomGap = if (showRecentsFab && showDialerFab) 150.dp else 90.dp) {
+            FloatingWindowFrame(palette, heightFraction = 0.62f, bottomGap = if (showRecentsFab && showDialerFab) 132.dp else 78.dp) {
                 recentsContent()
             }
         }
@@ -180,7 +180,7 @@ private fun FloatingWindowFrame(
             .fillMaxWidth()
             .fillMaxHeight(heightFraction)
             .padding(start = 12.dp, end = 12.dp, bottom = bottomGap)
-            .liquidGlass(palette, RoundedCornerShape(30.dp), tintAlpha = 0.97f)
+            .liquidGlass(palette, RoundedCornerShape(30.dp), tintAlpha = 0.84f)
             // touches inside the window must never fall through to the backdrop (which would close it)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
     ) {
