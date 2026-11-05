@@ -27,4 +27,10 @@
     <string name="widget_favorites_title">Favorites</string>
     <string name="widget_add_favorite">Add a favorite</string>
     <string name="widget_no_favorites">Star a contact to add it here</string>
+    <string name="shortcut_dialer">Dialer</string>
+    <string name="shortcut_dialer_long">Open Dialer</string>
+    <string name="shortcut_contacts">Contacts</string>
+    <string name="shortcut_contacts_long">Open Contacts</string>
+    <string name="shortcut_recents">Recents</string>
+    <string name="shortcut_recents_long">View Recent Calls</string>
 </resources>
