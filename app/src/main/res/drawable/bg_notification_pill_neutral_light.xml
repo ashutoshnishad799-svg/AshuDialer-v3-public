@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ripple-wrapped so a tap in the notification shows feedback (RippleDrawable works in RemoteViews since API 24). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#22000000">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFEDF0F5" />
+            <corners android:radius="14dp" />
+            
+        </shape>
+    </item>
+</ripple>
