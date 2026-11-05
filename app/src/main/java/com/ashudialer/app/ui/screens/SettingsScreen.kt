@@ -552,15 +552,12 @@ private fun TroubleshootingRows(
         anyRow = true
         NavRow(Icons.Filled.Settings, "Bluetooth headset audio", state(bluetoothOk, on = "Allowed", off = "Off. Tap to allow"), palette, onRequestBluetooth)
     }
-    // Battery is useful on EVERY ROM, so it is always here (next to Full screen calls and Bluetooth).
-    anyRow = true
-    NavRow(Icons.Filled.Build, "Battery: keep running in background", "Tap to check", palette) { oem.openAppBatterySettings(context) }
-    // Everything below is for Xiaomi's own software only (MIUI / HyperOS). It stays hidden on AOSP and other ROMs,
-    // even when the phone itself is a Xiaomi.
     if (miui) {
+        anyRow = true
         NavRow(Icons.Filled.Settings, "Xiaomi: Show on Lock screen", state(miuiLock), palette) { oem.openMiuiPermissionEditor(context) }
         NavRow(Icons.Filled.Settings, "Xiaomi: Open new windows while running in the background", state(miuiBg), palette) { oem.openMiuiPermissionEditor(context) }
         NavRow(Icons.Filled.Settings, "Xiaomi: Autostart", "Tap to check", palette) { oem.openMiuiAutostartSettings(context) }
+        NavRow(Icons.Filled.Build, "Battery: keep running in background", "Tap to check", palette) { oem.openAppBatterySettings(context) }
         NavRow(
             Icons.Filled.Settings,
             "Two missed-call alerts?",

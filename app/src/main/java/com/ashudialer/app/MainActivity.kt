@@ -209,19 +209,19 @@ class MainActivity : ComponentActivity() {
             val label = getString(
                 if (tab == DialerTab.CONTACTS) R.string.app_name_contacts else R.string.app_name_launcher
             )
-            // Label only: the icon comes from whichever launcher alias is enabled (see AppIconManager), so there is
-            // no fixed icon resource to name here any more.
+            val iconRes = if (tab == DialerTab.CONTACTS) R.mipmap.ic_launcher_contacts_png else R.mipmap.ic_launcher_png
             val description = if (Build.VERSION.SDK_INT >= 33) {
                 android.app.ActivityManager.TaskDescription.Builder()
                     .setLabel(label)
+                    .setIcon(iconRes)
                     .build()
             } else {
                 @Suppress("DEPRECATION")
-                android.app.ActivityManager.TaskDescription(label)
+                android.app.ActivityManager.TaskDescription(label, iconRes)
             }
             setTaskDescription(description)
         } catch (_: Exception) {
-            // Cosmetic only - never worth surfacing to the user.
+            // Cosmetic only - see doc comment above. Never worth surfacing to the user.
         }
     }
 
@@ -234,11 +234,7 @@ class MainActivity : ComponentActivity() {
         // extra explicitly asked for a tab; an alias launch never sets it, so the two can't
         // conflict.
         intent?.getStringExtra(EXTRA_OPEN_TAB)?.let { requested ->
-            return when (requested) {
-                TAB_CONTACTS -> DialerTab.CONTACTS
-                TAB_DIALER -> DialerTab.DIALER      // long-press shortcut; a hidden Dialer tab opens the floating dialer instead
-                else -> DialerTab.RECENT
-            }
+            return if (requested == TAB_CONTACTS) DialerTab.CONTACTS else DialerTab.RECENT
         }
 
         val componentName = intent?.component ?: return DialerTab.RECENT
@@ -257,7 +253,6 @@ class MainActivity : ComponentActivity() {
         /** Intent extra key: see the doc comment on launcherTabFor above. */
         const val EXTRA_OPEN_TAB = "com.ashudialer.app.EXTRA_OPEN_TAB"
         const val TAB_CONTACTS = "CONTACTS"
-        const val TAB_DIALER = "DIALER"
     }
 
     /**
@@ -762,15 +757,17 @@ class MainActivity : ComponentActivity() {
             }
 
 
-            // Local Backup now saves into a FOLDER ("Ashu Phone Backups") inside a place the person picks once; see
-            // util/BackupFolder.kt. Before, it dropped a single loose file wherever the Save-as box happened to be.
-            val exportFolderLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.OpenDocumentTree()
-            ) { tree ->
+            val exportBackupLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/octet-stream")
+            ) { uri ->
                 val bytes = viewModel.takePendingExportBytes()
-                if (tree != null && bytes != null) {
-                    com.ashudialer.app.util.BackupFolder.remember(context, tree)
-                    viewModel.setLocalBackupStatus(com.ashudialer.app.util.BackupFolder.saveAndDescribe(context, tree, bytes))
+                if (uri != null && bytes != null) {
+                    try {
+                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                        viewModel.setLocalBackupStatus("Backup saved. Keep the PIN somewhere safe — it can't be recovered.")
+                    } catch (e: Exception) {
+                        viewModel.setLocalBackupStatus("Couldn't save the file: ${e.message}")
+                    }
                 }
             }
 
@@ -2150,20 +2147,9 @@ class MainActivity : ComponentActivity() {
                                             },
                                             onExport = { pin ->
                                                 viewModel.exportLocalBackup(pin) {
-                                                    val remembered = com.ashudialer.app.util.BackupFolder.savedTree(context)
-                                                    val bytes = if (remembered != null) viewModel.takePendingExportBytes() else null
-                                                    if (remembered != null && bytes != null) {
-                                                        // Folder already chosen earlier: save straight into it.
-                                                        viewModel.setLocalBackupStatus(
-                                                            com.ashudialer.app.util.BackupFolder.saveAndDescribe(context, remembered, bytes)
-                                                        )
-                                                    } else {
-                                                        exportFolderLauncher.launch(com.ashudialer.app.util.BackupFolder.startUri())
-                                                    }
+                                                    exportBackupLauncher.launch("ashudialer_backup.adlb")
                                                 }
                                             },
-                                            backupFolderLabel = com.ashudialer.app.util.BackupFolder.savedTreeLabel(context),
-                                            onChangeBackupFolder = { com.ashudialer.app.util.BackupFolder.forget(context) },
                                             onPickImportFile = { importPickerLauncher.launch(arrayOf("*/*")) },
                                             pendingImportFileName = pendingImportFileName,
                                             onConfirmImport = { pin ->

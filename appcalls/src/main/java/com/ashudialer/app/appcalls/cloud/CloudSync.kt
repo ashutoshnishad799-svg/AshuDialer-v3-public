@@ -130,19 +130,6 @@ object CloudSync {
         return queued
     }
 
-    /**
-     * Uploads that are already queued keep the network / charging rules they were queued with (see KEEP in [enqueue]).
-     * So a recording saved while "Wi-Fi only" was ON went on waiting for Wi-Fi even after the person turned it OFF,
-     * which looked exactly like "it does not upload on mobile data". Call this right after "Wi-Fi only" or
-     * "Only while charging" changes: everything still waiting is cancelled and queued again with the new rules.
-     * Nothing is lost (files stay on the phone) and nothing is uploaded twice. Returns how many were queued.
-     */
-    fun requeueAfterSettingsChange(context: Context, files: List<File>, uriFor: (File) -> Uri? = { null }): Int {
-        val app = context.applicationContext
-        WorkManager.getInstance(app).cancelAllWorkByTag(WORK_TAG)
-        return backUpAll(app, files, uriFor)
-    }
-
     /** Schedules (once) the periodic check that catches recordings that never got backed up. */
     fun ensureSweepScheduled(context: Context) {
         val app = context.applicationContext

@@ -77,10 +77,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ashudialer.app.data.AppSettings
 import com.ashudialer.app.data.PKey
-import com.ashudialer.app.ui.components.AppIconPickerRow
 import com.ashudialer.app.ui.components.Avatar
 import com.ashudialer.app.ui.components.DialerTab
-import com.ashudialer.app.ui.components.NavOrderEditor
 import com.ashudialer.app.ui.components.bounceClick
 import com.ashudialer.app.ui.components.liquidGlass
 import com.ashudialer.app.ui.components.parseNavOrder
@@ -139,9 +137,7 @@ private data class Live(
     val fontSize: Int? = null,
     val depth: String? = null,
     val vibrate: Boolean? = null,
-    val callNotif: String? = null,
-    val callLook: String? = null,
-    val navAutoSave: Boolean? = null
+    val callNotif: String? = null
 )
 
 /** Mixes a hue (0..1) with a "shade" (0 = deep, 0.5 = pure, 1 = pastel) into one colour. */
@@ -211,8 +207,6 @@ fun PersonalizeScreen(
     val depth = live.depth ?: settings.buttonDepth
     val vibrate = live.vibrate ?: settings.vibrateOnButtonPress
     val callNotif = live.callNotif ?: settings.callNotifStyle
-    val callLook = live.callLook ?: settings.callNotifLook
-    val navAutoSave = live.navAutoSave ?: settings.navAutoSave
 
     val style = remember(baseStyle, glassPct, cornerPct, motionPct, hapticLv, avatar, density, navStyle, navLabels, keypad, specular, aurora, swipe, stagger) {
         baseStyle.copy(
@@ -321,13 +315,6 @@ fun PersonalizeScreen(
                 }
 
                 // ---------------------------------------------------------------- accent
-                // ---------------------------------------------------------------- app icon
-                item(key = "icon") {
-                    PCard("App icon", "The icon on your home screen. Tap one to switch; some launchers need a few seconds.", palette) {
-                        AppIconPickerRow(palette)
-                    }
-                }
-
                 item(key = "accent") {
                     PCard("Accent colour", "Tints buttons, highlights and the selected tab. Drag the sliders and watch the preview.", palette) {
                         val current = live.accent ?: settings.accentOverrideArgb
@@ -409,12 +396,12 @@ fun PersonalizeScreen(
                         LiveSlider("Frosting", "$glassPct%", glassPct.toFloat(), 0f, 100f, palette,
                             onLive = { live = live.copy(glass = it.roundToInt()) },
                             onCommit = { live = live.copy(glass = it.roundToInt()); onInt(PKey.GLASS, it.roundToInt()) })
-                        PrefSwitchRow("Light edge", "A thin highlight along the top edge of glass surfaces", specular, palette) {
+                        PrefSwitchRow("Shiny glass edge", "A bright rim that catches the light", specular, palette) {
                             live = live.copy(specular = it); onBool(PKey.SPECULAR, it)
                         }
                         PrefSwitchRow(
-                            "Background light",
-                            if (palette.glass) "Soft pale light behind the glass. Still, so it costs no battery" else "Only used by the Liquid Glass and Frost Glass themes",
+                            "Moving aurora light",
+                            if (palette.glass) "Soft colour drifting behind the glass" else "Only used by Liquid Glass and Frost Glass themes",
                             aurora, palette
                         ) { live = live.copy(aurora = it); onBool(PKey.AURORA, it) }
                         Spacer(Modifier.height(6.dp))
@@ -500,22 +487,46 @@ fun PersonalizeScreen(
                         ) { live = live.copy(navLabels = it); onString(PKey.NAV_LABELS, it) }
                         Spacer(Modifier.height(14.dp))
                         Text("Order", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                        Text("Press a tab and slide it. The preview below moves with your finger.", fontSize = 12.sp, color = palette.textSecondary)
+                        Text("Use the arrows to move a tab.", fontSize = 12.sp, color = palette.textSecondary)
+                        Spacer(Modifier.height(6.dp))
+                        val ordered = parseNavOrder(navOrder)
+                        ordered.forEachIndexed { i, tab ->
+                            val hidden = (tab == DialerTab.DIALER && !showDialer) || (tab == DialerTab.RECENT && !showRecent)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(palette.accentSoft.copy(alpha = if (hidden) 0.35f else 0.8f))
+                                    .padding(start = 14.dp, end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    tab.label + if (hidden) "  (hidden)" else "",
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (hidden) palette.textSecondary else palette.textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    enabled = i > 0,
+                                    onClick = {
+                                        val l = ordered.toMutableList(); l.removeAt(i); l.add(i - 1, tab)
+                                        val csv = serializeNavOrder(l)
+                                        live = live.copy(navOrder = csv); onString(PKey.NAV_ORDER, csv)
+                                    }
+                                ) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", tint = if (i > 0) palette.textPrimary else palette.textSecondary.copy(alpha = 0.3f)) }
+                                IconButton(
+                                    enabled = i < ordered.lastIndex,
+                                    onClick = {
+                                        val l = ordered.toMutableList(); l.removeAt(i); l.add(i + 1, tab)
+                                        val csv = serializeNavOrder(l)
+                                        live = live.copy(navOrder = csv); onString(PKey.NAV_ORDER, csv)
+                                    }
+                                ) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", tint = if (i < ordered.lastIndex) palette.textPrimary else palette.textSecondary.copy(alpha = 0.3f)) }
+                            }
+                        }
                         Spacer(Modifier.height(8.dp))
-                        NavOrderEditor(
-                            palette = palette,
-                            orderCsv = navOrder,
-                            showDialer = showDialer,
-                            showRecent = showRecent,
-                            autoSave = navAutoSave,
-                            onOrderSave = { csv -> live = live.copy(navOrder = csv); onString(PKey.NAV_ORDER, csv) }
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        PrefSwitchRow(
-                            "Auto-save order",
-                            if (navAutoSave) "Saved the moment you let go of a tab" else "You tap Save order yourself",
-                            navAutoSave, palette
-                        ) { live = live.copy(navAutoSave = it); onBool(PKey.NAV_AUTOSAVE, it) }
                         PrefSwitchRow("Show Dialer in the bar", "Turn off to open the dialer only from the floating button", showDialer, palette) {
                             live = live.copy(navShowDialer = it); onBool(PKey.NAV_SHOW_DIALER, it)
                         }
@@ -579,26 +590,14 @@ fun PersonalizeScreen(
                         Spacer(Modifier.height(10.dp))
                         Text("Call notification", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                         Text(
-                            "System style lets Android show its own call chip in the status bar on phones that support it. Custom card is this app's own notification.",
+                            "System style lets Android show the green call chip in the status bar on phones that support it. Glass style is the themed card.",
                             fontSize = 12.sp,
                             color = palette.textSecondary
                         )
                         Spacer(Modifier.height(6.dp))
-                        Segmented(listOf("auto" to "Auto", "system" to "System", "glass" to "Custom card"), callNotif, palette) {
+                        Segmented(listOf("auto" to "Auto", "system" to "System", "glass" to "Glass card"), callNotif, palette) {
                             live = live.copy(callNotif = it); onString(PKey.CALL_NOTIF, it)
                         }
-                        Spacer(Modifier.height(14.dp))
-                        Text("Notification look", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                        Text(
-                            "The card you see while on a call. Classic is a flat card that follows your light or dark theme; Themed takes your theme's colours; Slim is the one-row card.",
-                            fontSize = 12.sp,
-                            color = palette.textSecondary
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Segmented(
-                            listOf("classic" to "Classic", "dark" to "Dark", "light" to "Light", "themed" to "Themed", "minimal" to "Slim"),
-                            callLook, palette
-                        ) { live = live.copy(callLook = it); onString(PKey.CALL_NOTIF_LOOK, it) }
                     }
                 }
 

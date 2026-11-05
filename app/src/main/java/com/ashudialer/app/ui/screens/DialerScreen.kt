@@ -307,19 +307,6 @@ fun DialerScreen(
 
     val showAddContactHint = number.length >= 5 && matchedContacts.isEmpty()
 
-    // The suggestion box used to appear and vanish (fade + scale) every time a digit made the matches flip between
-    // "some" and "none", which looked like it was stuttering while dialing. Now it stays up for a moment after the
-    // last match disappears, so quick typing never makes it flicker.
-    var shownMatches by remember { mutableStateOf(matchedByContactId) }
-    LaunchedEffect(matchedByContactId) {
-        if (matchedByContactId.isNotEmpty()) {
-            shownMatches = matchedByContactId
-        } else {
-            kotlinx.coroutines.delay(260)
-            shownMatches = matchedByContactId
-        }
-    }
-
 
     val vibrate = rememberButtonHaptic(vibrateOnButtonPress)
 
@@ -377,14 +364,12 @@ fun DialerScreen(
         val keyFromWidth = (availW - sidePadF * 2f - 28f) / 3f
 
         val topPadF = 8f
-        val numberZoneF = 56f          // the typed number (sits at the BOTTOM of this zone, close to the keys)
-        val hintZoneF = 42f            // "Add to Contacts" / "Paste" chips (a chip is 36dp, so it can never be clipped)
-        // One FULL suggestion row is 8dp (list padding) + 62dp (row) = 70dp. This used to be 56dp, which is why the
-        // contact name / number in the floating dialer was cut off at the bottom.
-        val minMatchF = 80f
+        val numberZoneF = 64f          // the typed number
+        val hintZoneF = 48f            // "Add to Contacts" / "Paste" chips (a chip is 36dp, so it can never be clipped)
+        val minMatchF = 56f            // the suggestion list always has room for at least one row
         val haloF = 10f                // every key sits in a (key + 10dp) cell
-        val callTopGapF = 12f
-        val callBottomGapF = 22f
+        val callTopGapF = 14f
+        val callBottomGapF = 26f
 
         // Height left for 4 key rows + the call button once the fixed zones are taken out; the call button is
         // about 0.86 of a key, so the whole stack is (4 + 0.86) keys plus the margins.
@@ -413,16 +398,11 @@ fun DialerScreen(
         val callSize = callSizeF.dp
         val callTopGap = callTopGapF.dp
         val callBottomGap = callBottomGapF.dp
-        val numberFontTarget = when {
+        val numberFont = when {
             number.length <= 11 -> 36f
             number.length <= 15 -> 30f
             else -> 24f
         }
-        val numberFont by animateFloatAsState(
-            targetValue = numberFontTarget,
-            animationSpec = tween(140, easing = FastOutSlowInEasing),
-            label = "number-font"
-        )
 
     Column(
         modifier = Modifier
@@ -450,15 +430,15 @@ fun DialerScreen(
         // more contacts match; the zone itself is a fixed height, so nothing below it ever moves.
         Box(Modifier.fillMaxWidth().height(matchZoneH), contentAlignment = Alignment.BottomCenter) {
             androidx.compose.animation.AnimatedVisibility(
-                visible = shownMatches.isNotEmpty(),
-                enter = fadeIn(animationSpec = tween(140)) + slideInVertically(animationSpec = tween(170, easing = FastOutSlowInEasing)) { it / 6 },
-                exit = fadeOut(animationSpec = tween(110)),
+                visible = matchedByContactId.isNotEmpty(),
+                enter = fadeIn(animationSpec = tween(150)) + scaleIn(animationSpec = tween(170), initialScale = 0.97f),
+                exit = fadeOut(animationSpec = tween(100)) + scaleOut(animationSpec = tween(100), targetScale = 0.97f),
                 modifier = Modifier.fillMaxWidth().heightIn(max = matchZoneH)
             ) {
                 MatchedContactsList(
                     wide = wideSuggestions,
                     bleed = sidePad,
-                    matchedByContactId = shownMatches,
+                    matchedByContactId = matchedByContactId,
                     typedDigits = number,
                     palette = palette,
                     onCall = { num -> vibrate(); onCall(num) },
@@ -473,9 +453,8 @@ fun DialerScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(numberZoneH)
-                .then(if (layoutStyle == "glass") Modifier.glassCard(palette, 18.dp) else Modifier)
-                .padding(bottom = 2.dp),
-            contentAlignment = Alignment.BottomCenter
+                .then(if (layoutStyle == "glass") Modifier.glassCard(palette, 22.dp) else Modifier),
+            contentAlignment = Alignment.Center
         ) {
             BasicTextField(
                 value = numberField,

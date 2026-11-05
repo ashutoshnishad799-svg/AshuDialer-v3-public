@@ -49,13 +49,9 @@ fun LocalBackupScreen(
     onConfirmImport: (pin: String) -> Unit,
     statusMessage: String?,
     isBusy: Boolean,
-    modifier: Modifier = Modifier,
-    backupFolderLabel: String? = null,
-    onChangeBackupFolder: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     val palette = LocalDialerPalette.current
-    // Re-read after "Change folder" so the line under the button updates at once.
-    var folderForgotten by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf(LocalBackupMode.EXPORT) }
     var pin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
@@ -127,28 +123,6 @@ fun LocalBackupScreen(
                     ) {
                         if (isBusy) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                         else Text("Export Backup", fontWeight = FontWeight.SemiBold)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        if (backupFolderLabel != null && !folderForgotten) {
-                            "Saved into the folder \"Ashu Phone Backups\" inside \"$backupFolderLabel\"."
-                        } else {
-                            "You choose a place once. Backups then go into a folder called \"Ashu Phone Backups\" there, with the date in the file name."
-                        },
-                        fontSize = 12.sp,
-                        color = palette.textSecondary
-                    )
-                    if (backupFolderLabel != null && !folderForgotten) {
-                        Text(
-                            "Change folder",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = palette.accent,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onChangeBackupFolder(); folderForgotten = true }
-                                .padding(vertical = 8.dp)
-                        )
                     }
                     if (pin.isNotEmpty() && confirmPin.isNotEmpty() && pin != confirmPin) {
                         Spacer(Modifier.height(6.dp))

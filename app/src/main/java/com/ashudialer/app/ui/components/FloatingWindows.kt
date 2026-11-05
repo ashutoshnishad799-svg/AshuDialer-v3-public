@@ -111,8 +111,7 @@ fun FloatingQuickAccess(
             Box(
                 Modifier
                     .fillMaxSize()
-                    // 0.84 hid the page completely. Now the recent calls and their numbers stay readable behind the window.
-                    .background(palette.solidBackground.copy(alpha = 0.50f))
+                    .background(palette.solidBackground.copy(alpha = 0.84f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -130,7 +129,7 @@ fun FloatingQuickAccess(
                 fadeOut(tween(style.ms(140))),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            FloatingWindowFrame(palette, heightFraction = 0.72f, bottomGap = if (showRecentsFab && showDialerFab) 132.dp else 78.dp) {
+            FloatingWindowFrame(palette, heightFraction = 0.75f, bottomGap = if (showRecentsFab && showDialerFab) 132.dp else 78.dp) {
                 dialerContent()
             }
         }
@@ -181,8 +180,7 @@ private fun FloatingWindowFrame(
             .fillMaxWidth()
             .fillMaxHeight(heightFraction)
             .padding(start = 12.dp, end = 12.dp, bottom = bottomGap)
-            // A calmer corner (24dp, was 30dp) and a see-through pane (0.62, was 0.84): real frosted glass over the page.
-            .liquidGlass(palette, RoundedCornerShape(24.dp), tintAlpha = 0.62f)
+            .liquidGlass(palette, RoundedCornerShape(30.dp), tintAlpha = 0.84f)
             // touches inside the window must never fall through to the backdrop (which would close it)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
     ) {
@@ -209,8 +207,8 @@ private fun QuickButton(
         modifier = Modifier
             .size(sizeDp.dp)
             .clip(CircleShape)
-            .background(palette.accent)
-            .border(1.dp, Color.White.copy(alpha = 0.28f), CircleShape)
+            .background(Brush.linearGradient(listOf(palette.accent, palette.accent.copy(alpha = 0.82f))))
+            .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
             .bounceClick(pressedScale = 0.92f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

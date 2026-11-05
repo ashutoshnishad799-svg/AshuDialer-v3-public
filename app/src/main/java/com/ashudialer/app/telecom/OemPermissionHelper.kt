@@ -55,42 +55,24 @@ object OemPermissionHelper {
         }
     }
 
-    /**
-     * True only when the phone runs Xiaomi's OWN software (MIUI or HyperOS).
-     *
-     * It used to say yes for any Xiaomi / Redmi / POCO *hardware*, so someone running AOSP, LineageOS or another custom
-     * ROM on a Xiaomi phone still saw every "Xiaomi: ..." row in Settings. The ROM is what matters, not the brand of the
-     * phone: MIUI and HyperOS announce themselves through system properties, and their build strings have a fixed shape
-     * (V14.0.5.0.TMIMIXM, OS1.0.7.0.UMAMIXM) that AOSP and custom ROMs do not use.
-     */
-    fun isLikelyMiui(): Boolean = xiaomiRomDetected
-
-    private val xiaomiRomDetected: Boolean by lazy {
-        val props = listOf(
-            "ro.miui.ui.version.name",   // MIUI
-            "ro.miui.ui.version.code",
-            "ro.mi.os.version.name",     // HyperOS
-            "ro.mi.os.version.code"
-        )
-        val byProp = props.any { systemProperty(it).isNotBlank() }
-        val xiaomiHardware = Build.MANUFACTURER.contains("xiaomi", ignoreCase = true) ||
+    fun isLikelyMiui(): Boolean {
+        return Build.MANUFACTURER.contains("xiaomi", ignoreCase = true) ||
             Build.BRAND.contains("xiaomi", ignoreCase = true) ||
             Build.BRAND.contains("redmi", ignoreCase = true) ||
-            Build.BRAND.contains("poco", ignoreCase = true)
-        // Fallback for builds that hide the properties: Xiaomi's stock version strings (matches() needs the WHOLE string to fit).
-        val byBuildString = xiaomiHardware &&
-            Regex("(V\\d{2,3}\\.\\d+\\.\\d+\\.\\d+\\.[A-Z]{5,}|OS\\d+\\.\\d+\\.\\d+\\.\\d+\\.[A-Z]{5,})")
-                .matches(Build.VERSION.INCREMENTAL)
-        byProp || byBuildString
+            Build.BRAND.contains("poco", ignoreCase = true) ||
+            isMiuiBuildPropPresent()
     }
 
-    private fun systemProperty(key: String): String {
+    private fun isMiuiBuildPropPresent(): Boolean {
         return try {
             val getProp = Class.forName("android.os.SystemProperties")
                 .getMethod("get", String::class.java)
-            (getProp.invoke(null, key) as? String).orEmpty()
+            val result = getProp.invoke(null, "ro.miui.ui.version.name")
+            val value = result as? String
+            val isPresent = value != null && value.isNotBlank()
+            isPresent
         } catch (t: Throwable) {
-            ""
+            false
         }
     }
 

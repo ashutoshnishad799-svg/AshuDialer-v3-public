@@ -42,18 +42,6 @@ object CallNotificationHelper {
     @Volatile
     var callStyleMode: String = "auto"
 
-    /**
-     * Which card the custom call notification wears (Personalize > Calls > Notification look):
-     *  classic  - flat card that follows the app's light / dark theme (default)
-     *  dark     - flat graphite card, always
-     *  light    - flat white card, always
-     *  themed   - the card takes the colours of the selected app theme (the older per-theme cards)
-     *  minimal  - the slim one-row card, also when the notification is expanded
-     * Set by PixelInCallService from the settings flow.
-     */
-    @Volatile
-    var callLook: String = "classic"
-
     // v4 FIX ("seconds start running before I even pick up"): the ongoing-call notification used to
     // start its chronometer the moment an OUTGOING call began dialing, so the timer ran while the
     // other phone was still ringing. The timer now starts only once the call is really connected
@@ -430,8 +418,9 @@ object CallNotificationHelper {
                 builder.setUsesChronometer(false).setShowWhen(false)
             }
 
-            // Xiaomi's own software (MIUI / HyperOS) only; Xiaomi hardware running AOSP gets the system call style.
-            val isXiaomiFamily = OemPermissionHelper.isLikelyMiui()
+            val isXiaomiFamily = Build.MANUFACTURER.equals("xiaomi", true) ||
+                Build.MANUFACTURER.equals("redmi", true) ||
+                Build.MANUFACTURER.equals("poco", true)
 
             val useSystemCallStyle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && when (callStyleMode) {
                 "system" -> true
@@ -442,8 +431,8 @@ object CallNotificationHelper {
                 builder
                     .setStyle(NotificationCompat.DecoratedCustomViewStyle())
                     .setCustomContentView(compactViews)
-                    .setCustomBigContentView(if (callLook == "minimal") compactViews else views)
-                    .setCustomHeadsUpContentView(if (callLook == "minimal") compactViews else views)
+                    .setCustomBigContentView(views)
+                    .setCustomHeadsUpContentView(views)
                     .setContentTitle(callerName)
                     .setContentText(statusLabel)
                     .build()
@@ -471,8 +460,8 @@ object CallNotificationHelper {
                 builder
                     .setStyle(NotificationCompat.DecoratedCustomViewStyle())
                     .setCustomContentView(compactViews)
-                    .setCustomBigContentView(if (callLook == "minimal") compactViews else views)
-                    .setCustomHeadsUpContentView(if (callLook == "minimal") compactViews else views)
+                    .setCustomBigContentView(views)
+                    .setCustomHeadsUpContentView(views)
                     .setContentTitle(callerName)
                     .setContentText(statusLabel)
                     .build()
@@ -617,7 +606,6 @@ object CallNotificationHelper {
     private data class NotificationThemeStyle(
         val backgroundRes: Int,
         val activePillRes: Int,
-        val neutralPillRes: Int,
         val primaryText: Int,
         val secondaryText: Int
     )
@@ -636,23 +624,6 @@ object CallNotificationHelper {
         val systemIsDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
         val resolvedId = com.ashudialer.app.ui.theme.resolveThemeId(themeId, systemIsDark)
         val palette = com.ashudialer.app.ui.theme.paletteById(resolvedId)
-
-        // Every look except "themed" is a flat neutral card: no tint, no gradient, no glow.
-        if (callLook != "themed") {
-            val dark = when (callLook) {
-                "dark" -> true
-                "light" -> false
-                else -> palette.isDark
-            }
-            return NotificationThemeStyle(
-                backgroundRes = if (dark) R.drawable.bg_notification_glass else R.drawable.bg_notification_glass_light,
-                activePillRes = if (dark) R.drawable.bg_notification_pill_active else R.drawable.bg_notification_pill_active_light,
-                neutralPillRes = if (dark) R.drawable.bg_notification_pill_neutral else R.drawable.bg_notification_pill_neutral_light,
-                primaryText = android.graphics.Color.parseColor(if (dark) "#F2F4F8" else "#14181F"),
-                secondaryText = android.graphics.Color.parseColor(if (dark) "#A7ADB9" else "#5B6270")
-            )
-        }
-
         val bg = when (resolvedId) {
             "gradient" -> R.drawable.bg_notification_theme_gradient
             "midnight" -> R.drawable.bg_notification_theme_midnight
@@ -684,7 +655,6 @@ object CallNotificationHelper {
         return NotificationThemeStyle(
             backgroundRes = bg,
             activePillRes = active,
-            neutralPillRes = R.drawable.bg_notification_pill_neutral,
             primaryText = palette.textPrimary.toArgb(),
             secondaryText = palette.textSecondary.toArgb()
         )
@@ -757,7 +727,7 @@ object CallNotificationHelper {
             views.setTextViewText(R.id.notif_btn_mute_label, if (muted) "Muted" else "Mute")
             views.setInt(
                 R.id.notif_btn_speaker, "setBackgroundResource",
-                if (currentRoute == AudioRoute.EARPIECE) style.neutralPillRes else style.activePillRes
+                if (currentRoute == AudioRoute.EARPIECE) R.drawable.bg_notification_pill_neutral else style.activePillRes
             )
             views.setImageViewResource(
                 R.id.notif_btn_speaker_icon,
@@ -765,7 +735,7 @@ object CallNotificationHelper {
             )
             views.setInt(
                 R.id.notif_btn_mute, "setBackgroundResource",
-                if (muted) style.activePillRes else style.neutralPillRes
+                if (muted) style.activePillRes else R.drawable.bg_notification_pill_neutral
             )
         }
         return views

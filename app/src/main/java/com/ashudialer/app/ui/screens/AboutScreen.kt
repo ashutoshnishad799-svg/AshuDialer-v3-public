@@ -100,9 +100,7 @@ private data class Credit(
     val author: String,
     val license: String,
     val usedFor: String,
-    val url: String,
-    /** true = code or a binary from the project is in this app (the licence requires the credit); false = ideas only. */
-    val codeUsed: Boolean
+    val url: String
 )
 
 private val credits = listOf(
@@ -111,48 +109,42 @@ private val credits = listOf(
         "kitsumed and contributors",
         "GPL-3.0-or-later",
         "The call-recording engine (Shizuku shell service, recording coordinator, session logic) is adapted from this project. Ashu Phone's recorder is a modified fork derived from it.",
-        "https://github.com/kitsumed/ShizuCallRecorder",
-        codeUsed = true
+        "https://github.com/kitsumed/ShizuCallRecorder"
     ),
     Credit(
         "Ever Dialer",
         "hari161008 and contributors",
         "GPL-3.0",
         "Recorder module groundwork and ideas for recorder settings, haptic strength, bottom-bar customisation and glass looks.",
-        "https://github.com/hari161008/Ever-Dialer",
-        codeUsed = true
+        "https://github.com/hari161008/Ever-Dialer"
     ),
     Credit(
         "CallVault",
         "madkongo (itself a fork of ShizuCallRecorder)",
         "GPL-3.0 with additional terms",
         "Ideas only: backing up through the system file picker and Drive app, marking moments, stars, tags and notes on recordings. The code in Ashu Phone was written separately.",
-        "https://github.com/madkongo/CallVault",
-        codeUsed = false
+        "https://github.com/madkongo/CallVault"
     ),
     Credit(
         "JemRec",
         "Yevhen Yemchynskyi",
         "Apache-2.0",
         "Ideas only: marking moments, discarding very short recordings and recorder health checks. No JemRec code is included.",
-        "https://github.com/jemcik/JemRec",
-        codeUsed = false
+        "https://github.com/jemcik/JemRec"
     ),
     Credit(
         "scrcpy",
         "Genymobile",
         "Apache-2.0",
         "The bundled scrcpy-server (unmodified) used by the app-call recorder.",
-        "https://github.com/Genymobile/scrcpy",
-        codeUsed = true
+        "https://github.com/Genymobile/scrcpy"
     ),
     Credit(
         "Shizuku and Shizuku-API",
         "RikkaApps",
         "Apache-2.0",
         "The privileged helper that lets recording work without root.",
-        "https://github.com/RikkaApps/Shizuku",
-        codeUsed = true
+        "https://github.com/RikkaApps/Shizuku"
     )
 )
 
@@ -250,23 +242,37 @@ fun AboutScreen(
                 }
             }
 
-            AboutSectionLabel("BUILT ON (CODE OR GROUNDWORK IN THIS APP)", palette)
+            AboutSectionLabel("OPEN-SOURCE CREDITS", palette)
             Text(
-                "Ashu Phone is free software under the GNU GPL v3 or later. Parts of it are adapted from, or bundle, these projects. Their licences require this credit, so it stays.",
+                "Ashu Phone is free software under the GNU GPL v3 or later. It stands on the work of these projects \u2014 thank you.",
                 fontSize = 12.5.sp,
                 color = palette.textSecondary,
                 modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 8.dp)
             )
-            CreditsCard(credits.filter { it.codeUsed }, palette) { uriHandler.openUri(it) }
-
-            AboutSectionLabel("INSPIRATION (IDEAS ONLY, NO CODE COPIED)", palette)
-            Text(
-                "These projects gave ideas. None of their code is in Ashu Phone. They are thanked as a courtesy, not because a licence asks for it.",
-                fontSize = 12.5.sp,
-                color = palette.textSecondary,
-                modifier = Modifier.padding(horizontal = 22.dp).padding(bottom = 8.dp)
-            )
-            CreditsCard(credits.filter { !it.codeUsed }, palette) { uriHandler.openUri(it) }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .glassCard(palette, 18.dp)
+            ) {
+                credits.forEachIndexed { index, c ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { uriHandler.openUri(c.url) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(c.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary, modifier = Modifier.weight(1f))
+                            Icon(Icons.Filled.OpenInNew, contentDescription = "Open", tint = palette.textSecondary, modifier = Modifier.size(16.dp))
+                        }
+                        Text("${c.author} \u2022 ${c.license}", fontSize = 12.sp, color = palette.accent)
+                        Spacer(Modifier.height(3.dp))
+                        Text(c.usedFor, fontSize = 12.5.sp, color = palette.textSecondary, lineHeight = 17.sp)
+                    }
+                    if (index != credits.lastIndex) HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
+                }
+            }
 
             Text(
                 "Ashu Phone is a modified edition. The original projects above are not affiliated with it, and the changes made here are described in CHANGELOG.md.",
@@ -304,32 +310,4 @@ private fun LinkPill(label: String, palette: DialerPalette, onClick: () -> Unit)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp)
     )
-}
-
-@Composable
-private fun CreditsCard(items: List<Credit>, palette: DialerPalette, onOpen: (String) -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .glassCard(palette, 18.dp)
-    ) {
-        items.forEachIndexed { index, c ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpen(c.url) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(c.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary, modifier = Modifier.weight(1f))
-                    Icon(Icons.Filled.OpenInNew, contentDescription = "Open", tint = palette.textSecondary, modifier = Modifier.size(16.dp))
-                }
-                Text("${c.author} \u2022 ${c.license}", fontSize = 12.sp, color = palette.accent)
-                Spacer(Modifier.height(3.dp))
-                Text(c.usedFor, fontSize = 12.5.sp, color = palette.textSecondary, lineHeight = 17.sp)
-            }
-            if (index != items.lastIndex) HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
-        }
-    }
 }

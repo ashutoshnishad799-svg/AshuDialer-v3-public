@@ -259,22 +259,10 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
                 } else {
                     // ----------------------------------------------------------- folder
                     if (!folderPicked) {
-                        PrimaryPill("Choose a folder", palette) { picker.launch(phoneStorageStartUri()) }
+                        PrimaryPill("Choose a folder", palette) { picker.launch(null) }
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "On your phone: the picker opens on Phone storage. Tap the new-folder icon (top right), name it \u201CAshu Phone Recordings\u201D, open it, then press \u201CUse this folder\u201D.",
-                            fontSize = 12.sp,
-                            color = palette.textSecondary
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "No Phone / Internal storage in the list? On AOSP and some other ROMs it is hidden: tap \u22EE (top right) \u2192 \u201CShow internal storage\u201D, then open \u2630 and pick it.",
-                            fontSize = 12.sp,
-                            color = palette.textSecondary
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "For Google Drive: \u2630 menu \u2192 Drive \u2192 make or open a folder \u2192 \u201CUse this folder\u201D.",
+                            "For Google Drive: in the picker open the \u2630 menu \u2192 Drive \u2192 make or open a folder \u2192 \u201CUse this folder\u201D. For your phone: choose any folder in Internal storage.",
                             fontSize = 12.sp,
                             color = palette.textSecondary
                         )
@@ -313,7 +301,7 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
                             Text(
                                 "Change",
                                 fontSize = 13.sp, fontWeight = FontWeight.Bold, color = palette.accent,
-                                modifier = Modifier.bounceClick { picker.launch(phoneStorageStartUri()) }.padding(6.dp)
+                                modifier = Modifier.bounceClick { picker.launch(null) }.padding(6.dp)
                             )
                         }
                         if (kind == FolderKind.PHONE) {
@@ -332,25 +320,11 @@ fun CloudBackupCard(palette: DialerPalette, modifier: Modifier = Modifier) {
                     PrefSwitchRow("Back up new recordings automatically", "Right after each call recording is saved", prefs.autoBackup, palette) {
                         prefs.autoBackup = it; tick++
                     }
-                    PrefSwitchRow("Wi\u2011Fi only", "On: uploads wait for Wi\u2011Fi. Off: they also use mobile data, automatically (not needed for phone folders)", prefs.wifiOnly, palette) {
-                        prefs.wifiOnly = it
-                        // Uploads that are already waiting keep the rules they were queued with - queue them again so
-                        // turning this OFF really lets them go out on mobile data.
-                        requeueWaiting(context)
-                        tick++
+                    PrefSwitchRow("Wi\u2011Fi only", "Don't use mobile data for uploads (not needed for phone folders)", prefs.wifiOnly, palette) {
+                        prefs.wifiOnly = it; tick++
                     }
                     PrefSwitchRow("Only while charging", "Upload when the phone is plugged in", prefs.chargingOnly, palette) {
-                        prefs.chargingOnly = it
-                        requeueWaiting(context)
-                        tick++
-                    }
-                    if (!prefs.wifiOnly && prefs.mode == CloudPrefs.MODE_FOLDER) {
-                        Text(
-                            "Folder inside the Google Drive app? Drive uploads that folder itself and has its own switch: Drive \u2192 Settings \u2192 Data usage \u2192 \u201CTransfer files only over Wi\u2011Fi\u201D. Turn it off there too, or use \u201CGoogle account\u201D above to upload straight from this app on mobile data.",
-                            fontSize = 11.5.sp,
-                            color = palette.textSecondary,
-                            modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
-                        )
+                        prefs.chargingOnly = it; tick++
                     }
                     PrefSwitchRow(
                         "Keep recordings only in the cloud",
@@ -564,22 +538,5 @@ internal fun MarkMomentButton(modifier: Modifier = Modifier) {
             Spacer(Modifier.width(4.dp))
             Text("$count", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5C3B00))
         }
-    }
-}
-
-
-/**
- * Opens Android's folder picker straight on the phone's own storage. Some ROMs (AOSP among them) hide "Phone / Internal
- * storage" from the picker's side menu, which made it look like there was no Phone option at all.
- */
-private fun phoneStorageStartUri(): android.net.Uri =
-    android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:")
-
-/** Queue everything that still waits again, so a changed Wi-Fi / charging rule applies to it too. */
-private fun requeueWaiting(context: android.content.Context) {
-    val files = CallRecorder.listRecordings(context)
-    CloudSync.requeueAfterSettingsChange(context, files) { f ->
-        if (f.absolutePath.startsWith(context.filesDir.absolutePath)) null
-        else resolveRecordingUri(context, f)
     }
 }
