@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon: Dialer / Contacts / Recents. Same MainActivity, the tab comes from EXTRA_OPEN_TAB. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="open_dialer"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_dialer"
+        android:shortcutShortLabel="@string/shortcut_dialer"
+        android:shortcutLongLabel="@string/shortcut_dialer_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.ashudialer.app"
+            android:targetClass="com.ashudialer.app.MainActivity">
+            <extra android:name="com.ashudialer.app.EXTRA_OPEN_TAB" android:value="DIALER" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="open_contacts"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_contacts"
+        android:shortcutShortLabel="@string/shortcut_contacts"
+        android:shortcutLongLabel="@string/shortcut_contacts_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.ashudialer.app"
+            android:targetClass="com.ashudialer.app.MainActivity">
+            <extra android:name="com.ashudialer.app.EXTRA_OPEN_TAB" android:value="CONTACTS" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="open_recents"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_recents"
+        android:shortcutShortLabel="@string/shortcut_recents"
+        android:shortcutLongLabel="@string/shortcut_recents_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.ashudialer.app"
+            android:targetClass="com.ashudialer.app.MainActivity">
+            <extra android:name="com.ashudialer.app.EXTRA_OPEN_TAB" android:value="RECENT" />
+        </intent>
+    </shortcut>
+</shortcuts>

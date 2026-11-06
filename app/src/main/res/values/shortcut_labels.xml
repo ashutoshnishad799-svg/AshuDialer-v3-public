@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Labels for the long-press shortcuts on the app icon (res/xml/shortcuts.xml).
+    Kept in their OWN file on purpose: if strings.xml is ever replaced by an older copy, the shortcuts still link.
+-->
+<resources>
+    <string name="shortcut_dialer">Dialer</string>
+    <string name="shortcut_dialer_long">Open the dial pad</string>
+    <string name="shortcut_contacts">Contacts</string>
+    <string name="shortcut_contacts_long">Open Contacts</string>
+    <string name="shortcut_recents">Recents</string>
+    <string name="shortcut_recents_long">Open recent calls</string>
+</resources>
