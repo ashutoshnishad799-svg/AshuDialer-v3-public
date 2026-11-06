@@ -213,7 +213,10 @@ class PixelInCallService : InCallService() {
                 app.appSettingsRepository.settingsFlow.collect {
                     latestSettings = it
                     CallNotificationHelper.callStyleMode = it.callNotifStyle
+<<<<<<< HEAD
                     CallNotificationHelper.callLook = it.callNotifLook
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                 }
             }
         }

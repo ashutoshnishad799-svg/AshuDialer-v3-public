@@ -86,10 +86,16 @@ private val NavCellHeight = 56.dp
 
 /**
  * The bottom bar. A frosted "glass" pill sits under the selected tab. Tap a tab and the pill glides there. Put a
+<<<<<<< HEAD
  * finger on the bar and slide it left or right and the pill follows the finger (with a light tick for every tab it
  * passes); the tab is chosen only when the finger lifts, on the nearest tab.
  * v2.1: it used to select every tab the pill passed over, so sliding across the bar made pages (and the Dialer window)
  * flash open and slide away under the finger. Only THIS bar reacts to sliding; the pages themselves do not swipe.
+=======
+ * finger on the bar and slide it left or right and the pill follows the finger, the tab under it is selected as it
+ * passes (so the screen above switches with its slide animation), and on release it settles on the nearest tab.
+ * Only THIS bar reacts to sliding; the pages themselves do not swipe.
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
  */
 @Composable
 fun DialerBottomNav(
@@ -116,11 +122,14 @@ fun DialerBottomNav(
         currentOnSelect(tab)
     }
 
+<<<<<<< HEAD
     // A tick that does NOT select anything: used while the pill is only passing over a tab.
     val tickOnly: () -> Unit = {
         if (hapticState.value > 0) view.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
     }
 
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     // Pill position in tab units (0.0 = first tab ... 4.0 = last). NaN while no finger is dragging.
     var dragPosition by remember { mutableFloatStateOf(Float.NaN) }
     var lastDragPosition by remember { mutableFloatStateOf(selIndex.toFloat()) }
@@ -172,10 +181,15 @@ fun DialerBottomNav(
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == down.id } ?: break
                             if (!change.pressed) {
+<<<<<<< HEAD
                                 // A plain tap selects the tab that was touched; a slide selects the tab the pill
                                 // is over at the moment the finger lifts.
                                 if (!dragged) fireSelect(tabs[indexAt(change.position.x)])
                                 else fireSelect(tabs[pillAt(change.position.x).roundToInt().coerceIn(0, tabs.size - 1)])
+=======
+                                // A plain tap (no slide): select the tab that was touched.
+                                if (!dragged) fireSelect(tabs[indexAt(change.position.x)])
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                                 break
                             }
                             if (!dragged && abs(change.position.x - down.position.x) > slop) {
@@ -190,7 +204,11 @@ fun DialerBottomNav(
                                 val idx = p.roundToInt().coerceIn(0, tabs.size - 1)
                                 if (idx != lastIndex) {
                                     lastIndex = idx
+<<<<<<< HEAD
                                     tickOnly()
+=======
+                                    fireSelect(tabs[idx])
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                                 }
                             }
                         }

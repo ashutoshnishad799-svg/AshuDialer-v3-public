@@ -10,6 +10,7 @@
  */
 package com.ashudialer.app.ui.components
 
+<<<<<<< HEAD
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
@@ -33,10 +34,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+=======
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+<<<<<<< HEAD
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,18 +60,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+=======
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.SettingsBrightness
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+<<<<<<< HEAD
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+=======
+import androidx.compose.ui.text.font.FontWeight
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ashudialer.app.ui.theme.AUTO_THEME_ID
 import com.ashudialer.app.ui.theme.AllPalettes
+<<<<<<< HEAD
 import com.ashudialer.app.ui.theme.DialerPalette
 import com.ashudialer.app.ui.theme.LocalAshuStyle
 import com.ashudialer.app.ui.theme.LocalDialerPalette
@@ -68,6 +91,11 @@ import com.ashudialer.app.ui.theme.LocalDialerPalette
  * The small pill at the top of the screen that shows the current theme and opens the picker.
  * v2.1: a quiet hairline pill with a swatch of the current theme (was an outlined button with a palette icon).
  */
+=======
+import com.ashudialer.app.ui.theme.LocalDialerPalette
+
+
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 @Composable
 fun ThemePickerButton(
     onClick: () -> Unit,
@@ -76,6 +104,7 @@ fun ThemePickerButton(
 ) {
     val palette = LocalDialerPalette.current
     val label = if (currentThemeId == AUTO_THEME_ID) "System" else palette.displayName
+<<<<<<< HEAD
     val shape = RoundedCornerShape(18.dp)
 
     Row(
@@ -113,6 +142,29 @@ private val themeFilters = listOf("All", "Light", "Dark", "Glass")
  * colour dot, so you can see what you are picking. Filter chips narrow the list; cards glide in one after another and the
  * chosen one gets an animated ring and tick.
  */
+=======
+
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, palette.cardBorder),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = palette.cardBackground),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Palette,
+            contentDescription = "Change theme",
+            tint = palette.accent,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(text = label, color = palette.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThemePickerSheet(
@@ -121,6 +173,7 @@ fun ThemePickerSheet(
     onDismiss: () -> Unit
 ) {
     val palette = LocalDialerPalette.current
+<<<<<<< HEAD
     var filter by remember { mutableIntStateOf(0) }
     val shown = remember(filter) {
         AllPalettes.filter {
@@ -132,11 +185,14 @@ fun ThemePickerSheet(
             }
         }
     }
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = palette.cardBackground
     ) {
+<<<<<<< HEAD
         Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Appearance", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
             Text(
@@ -336,5 +392,94 @@ private fun SystemMiniScreen() {
         contentAlignment = Alignment.Center
     ) {
         Icon(Icons.Filled.SettingsBrightness, contentDescription = null, tint = Color(0xFF7A8294), modifier = Modifier.size(26.dp))
+=======
+        Column(modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp)) {
+            Text(
+                "Choose a theme",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = palette.textPrimary,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.height(320.dp)
+            ) {
+                item {
+                    val isSelected = currentThemeId == AUTO_THEME_ID
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { onSelect(AUTO_THEME_ID) }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(palette.textSecondary.copy(alpha = 0.35f), palette.textPrimary.copy(alpha = 0.55f))
+                                    )
+                                )
+                                .border(
+                                    width = if (isSelected) 3.dp else 0.dp,
+                                    color = if (isSelected) palette.accent else Color.Transparent,
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.SettingsBrightness, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "System",
+                            fontSize = 12.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = palette.textPrimary
+                        )
+                    }
+                }
+
+                items(AllPalettes) { p ->
+                    val isSelected = p.id == currentThemeId
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.clickable { onSelect(p.id) }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(p.swatchStart, p.swatchEnd)))
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) p.accent else Color.Black.copy(alpha = 0.12f),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier.size(26.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.9f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Filled.Check, contentDescription = "Selected", tint = p.accent, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = p.displayName,
+                            fontSize = 12.5.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = palette.textPrimary
+                        )
+                    }
+                }
+            }
+        }
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     }
 }

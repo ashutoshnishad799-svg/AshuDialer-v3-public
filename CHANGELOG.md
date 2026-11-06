@@ -1,5 +1,6 @@
 # Changelog
 
+<<<<<<< HEAD
 ## 2.1.0 - 5 November 2026  (classic look, new icons, folder backups)
 
 Modified edition of 2.0.1. Files changed since 2.0.1 are listed at the bottom (GPL section 5(a)).
@@ -68,6 +69,8 @@ Added: values/shortcut_labels.xml, AppIconManager.kt, BackupFolder.kt, AppIconPi
 shortcut drawables and four adaptive icons (ic_launcher_classic, _graphite, _pearl, _keypad), bg_notification_*_light drawables.
 Removed: the old launcher icons (ic_launcher*, ic_launcher_contacts*).
 
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 ## 2.0.1 - 31 October 2026  (smoothness, calls and backup update)
 
 Modified edition of 2.0.0. Files changed since 1.8.0 are listed at the bottom (GPL section 5(a)).

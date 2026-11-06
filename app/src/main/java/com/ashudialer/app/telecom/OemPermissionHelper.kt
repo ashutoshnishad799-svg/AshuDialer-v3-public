@@ -55,6 +55,7 @@ object OemPermissionHelper {
         }
     }
 
+<<<<<<< HEAD
     /**
      * True only when the phone runs Xiaomi's OWN software (MIUI or HyperOS).
      *
@@ -91,6 +92,26 @@ object OemPermissionHelper {
             (getProp.invoke(null, key) as? String).orEmpty()
         } catch (t: Throwable) {
             ""
+=======
+    fun isLikelyMiui(): Boolean {
+        return Build.MANUFACTURER.contains("xiaomi", ignoreCase = true) ||
+            Build.BRAND.contains("xiaomi", ignoreCase = true) ||
+            Build.BRAND.contains("redmi", ignoreCase = true) ||
+            Build.BRAND.contains("poco", ignoreCase = true) ||
+            isMiuiBuildPropPresent()
+    }
+
+    private fun isMiuiBuildPropPresent(): Boolean {
+        return try {
+            val getProp = Class.forName("android.os.SystemProperties")
+                .getMethod("get", String::class.java)
+            val result = getProp.invoke(null, "ro.miui.ui.version.name")
+            val value = result as? String
+            val isPresent = value != null && value.isNotBlank()
+            isPresent
+        } catch (t: Throwable) {
+            false
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         }
     }
 

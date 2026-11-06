@@ -10,10 +10,13 @@
  */
 package com.ashudialer.app.ui.screens
 
+<<<<<<< HEAD
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,9 +31,12 @@ import androidx.compose.material.icons.filled.CallReceived
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+<<<<<<< HEAD
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,8 +52,11 @@ import com.ashudialer.app.data.DailyCallSummary
 import com.ashudialer.app.data.ContactTimeShare
 import com.ashudialer.app.data.InsightsPeriod
 import com.ashudialer.app.ui.components.Avatar
+<<<<<<< HEAD
 import com.ashudialer.app.ui.components.bounceClick
 import com.ashudialer.app.ui.components.staggerIn
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import com.ashudialer.app.ui.theme.DialerPalette
 import com.ashudialer.app.ui.theme.LocalDialerPalette
 import com.ashudialer.app.ui.components.glassCard
@@ -100,7 +109,11 @@ fun CallInsightsScreen(
             item {
                 Spacer(Modifier.height(12.dp))
                 // Large hero card: the visual hierarchy now matches a full-screen analytics page instead of a stack of small cards.
+<<<<<<< HEAD
                 Column(Modifier.fillMaxWidth().staggerIn(0).glassCard(palette, 24.dp).padding(20.dp)) {
+=======
+                Column(Modifier.fillMaxWidth().glassCard(palette, 24.dp).padding(20.dp)) {
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     Text("${insights.totalCalls} calls", fontSize = 31.sp, fontWeight = FontWeight.ExtraBold, color = palette.textPrimary)
                     Text("${formatDurationCompact(insights.totalTalkTimeSeconds)} total talk time", fontSize = 14.sp, color = palette.textSecondary)
                     Spacer(Modifier.height(16.dp))
@@ -114,7 +127,11 @@ fun CallInsightsScreen(
             }
 
             item {
+<<<<<<< HEAD
                 Row(Modifier.staggerIn(1), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+=======
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     StatCard("Average call", formatDurationCompact(insights.averageCallSeconds), palette, modifier = Modifier.weight(1f))
                     StatCard("Longest call", formatDurationCompact(insights.longestCallSeconds), palette, modifier = Modifier.weight(1f))
                 }
@@ -129,7 +146,11 @@ fun CallInsightsScreen(
             }
 
             item {
+<<<<<<< HEAD
                 Column(Modifier.fillMaxWidth().staggerIn(3).glassCard(palette, 20.dp).padding(vertical = 4.dp)) {
+=======
+                Column(Modifier.fillMaxWidth().glassCard(palette, 20.dp).padding(vertical = 4.dp)) {
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     insights.dailySummaries.asReversed().forEachIndexed { index, summary ->
                         DaySummaryRow(summary, palette) { onSelectedDayChange(summary) }
                         if (index != insights.dailySummaries.lastIndex) HorizontalDivider(color = palette.cardBorder)
@@ -142,7 +163,11 @@ fun CallInsightsScreen(
                 item {
                     SectionTitle("People you talk to most", "Ranked by total talk time", palette)
                     Spacer(Modifier.height(8.dp))
+<<<<<<< HEAD
                     Column(Modifier.fillMaxWidth().staggerIn(4).glassCard(palette, 20.dp)) {
+=======
+                    Column(Modifier.fillMaxWidth().glassCard(palette, 20.dp)) {
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                         val maxSeconds = insights.topContactsByTime.maxOf { it.totalSeconds }
                         insights.topContactsByTime.forEachIndexed { index, contact ->
                             TopContactRow(contact, maxSeconds, palette)
@@ -155,7 +180,11 @@ fun CallInsightsScreen(
 
             if (insights.longestCallWith != null) {
                 item {
+<<<<<<< HEAD
                     Column(Modifier.fillMaxWidth().staggerIn(5).glassCard(palette, 20.dp).padding(18.dp)) {
+=======
+                    Column(Modifier.fillMaxWidth().glassCard(palette, 20.dp).padding(18.dp)) {
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                         Text("Longest conversation", fontSize = 12.5.sp, color = palette.textSecondary)
                         Spacer(Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -175,7 +204,11 @@ fun CallInsightsScreen(
                 item {
                     SectionTitle("One-sided calling", "People where calls only go one way", palette)
                     Spacer(Modifier.height(8.dp))
+<<<<<<< HEAD
                     Column(Modifier.fillMaxWidth().staggerIn(6).glassCard(palette, 20.dp)) {
+=======
+                    Column(Modifier.fillMaxWidth().glassCard(palette, 20.dp)) {
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                         insights.oneSidedCallers.forEachIndexed { index, caller ->
                             OneSidedCallerRow(caller, palette)
                             if (index != insights.oneSidedCallers.lastIndex) HorizontalDivider(color = palette.cardBorder)
@@ -207,7 +240,11 @@ private fun MiniMetric(label: String, value: String, icon: ImageVector, tint: Co
 
 @Composable
 private fun DaySummaryRow(summary: DailyCallSummary, palette: DialerPalette, onClick: () -> Unit) {
+<<<<<<< HEAD
     Row(Modifier.fillMaxWidth().bounceClick(pressedScale = 0.985f, onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+=======
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         Column(Modifier.weight(1f)) {
             Text(summary.label, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
             Text("${summary.totalCalls} calls · ${formatDurationCompact(summary.talkTimeSeconds)} talk time", fontSize = 11.5.sp, color = palette.textSecondary)
@@ -218,6 +255,7 @@ private fun DaySummaryRow(summary: DailyCallSummary, palette: DialerPalette, onC
 
 @Composable
 private fun PeriodChip(label: String, selected: Boolean, palette: DialerPalette, onClick: () -> Unit) {
+<<<<<<< HEAD
     val chipColor by animateColorAsState(
         targetValue = if (selected) palette.accent else palette.cardBackground,
         animationSpec = tween(220, easing = FastOutSlowInEasing),
@@ -236,6 +274,16 @@ private fun PeriodChip(label: String, selected: Boolean, palette: DialerPalette,
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = chipText)
+=======
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (selected) palette.accent else palette.cardBackground)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (selected) Color.White else palette.textPrimary)
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     }
 }
 
@@ -284,6 +332,7 @@ private fun DayOverDayChart(summaries: List<DailyCallSummary>, palette: DialerPa
     // day fine" symptom). Giving the bar a fixed-height Box to grow
     // within, separate from a fixed-height label slot below it, removes
     // the shared-measurement path entirely.
+<<<<<<< HEAD
     // Bars start flat and grow to their value, one after another, whenever the data changes (period switch included).
     var barsUp by remember { mutableStateOf(false) }
     LaunchedEffect(summaries) {
@@ -291,6 +340,8 @@ private fun DayOverDayChart(summaries: List<DailyCallSummary>, palette: DialerPa
         kotlinx.coroutines.delay(60)
         barsUp = true
     }
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -298,6 +349,7 @@ private fun DayOverDayChart(summaries: List<DailyCallSummary>, palette: DialerPa
             .padding(horizontal = 10.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+<<<<<<< HEAD
         summaries.forEachIndexed { barIndex, summary ->
             val count = summary.totalCalls
             val target = (count.toFloat() / maxCount.toFloat()).coerceIn(0.04f, 1f)
@@ -306,11 +358,20 @@ private fun DayOverDayChart(summaries: List<DailyCallSummary>, palette: DialerPa
                 animationSpec = tween(560, delayMillis = (barIndex * 45).coerceAtMost(400), easing = FastOutSlowInEasing),
                 label = "insight-bar"
             )
+=======
+        summaries.forEach { summary ->
+            val count = summary.totalCalls
+            val fraction = (count.toFloat() / maxCount.toFloat()).coerceIn(0.04f, 1f)
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .weight(1f)
+<<<<<<< HEAD
                     .bounceClick(pressedScale = 0.9f) { onDayClick(summary) }
+=======
+                    .clickable { onDayClick(summary) }
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             ) {
                 Box(
                     modifier = Modifier

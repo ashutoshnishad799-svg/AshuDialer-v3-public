@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<<<<<<< HEAD
 <!-- Ripple-wrapped so a tap in the notification shows feedback (RippleDrawable works in RemoteViews since API 24). -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#33FFFFFF">
@@ -7,6 +8,27 @@
             <solid android:color="#FF2B2E37" />
             <corners android:radius="14dp" />
             
+=======
+<!--
+  Wrapped in a ripple so tapping Mute/Speaker in the notification actually
+  shows touch feedback. These buttons were always functionally clickable
+  (setOnClickPendingIntent was correctly wired in CallNotificationHelper),
+  but with a flat static <shape> as the only background there was no visual
+  response to a tap, which read as unresponsive/"stuck on" rather than a
+  real button - RippleDrawable is supported inside notification RemoteViews
+  from API 24+ and this app's minSdk is 29, so it's safe unconditionally.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#66FFFFFF">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="90"
+                android:startColor="#33FFFFFF"
+                android:endColor="#14FFFFFF" />
+            <corners android:radius="14dp" />
+            <stroke android:width="1dp" android:color="#1FFFFFFF" />
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         </shape>
     </item>
 </ripple>

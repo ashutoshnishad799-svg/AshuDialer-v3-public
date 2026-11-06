@@ -74,8 +74,13 @@ android {
         applicationId = "com.ashudialer.app"
         minSdk = 29
         targetSdk = 35
+<<<<<<< HEAD
         versionCode = 18
         versionName = "2.1.0"
+=======
+        versionCode = 17
+        versionName = "2.0.1"
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

@@ -77,10 +77,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ashudialer.app.data.AppSettings
 import com.ashudialer.app.data.PKey
+<<<<<<< HEAD
 import com.ashudialer.app.ui.components.AppIconPickerRow
 import com.ashudialer.app.ui.components.Avatar
 import com.ashudialer.app.ui.components.DialerTab
 import com.ashudialer.app.ui.components.NavOrderEditor
+=======
+import com.ashudialer.app.ui.components.Avatar
+import com.ashudialer.app.ui.components.DialerTab
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import com.ashudialer.app.ui.components.bounceClick
 import com.ashudialer.app.ui.components.liquidGlass
 import com.ashudialer.app.ui.components.parseNavOrder
@@ -139,9 +144,13 @@ private data class Live(
     val fontSize: Int? = null,
     val depth: String? = null,
     val vibrate: Boolean? = null,
+<<<<<<< HEAD
     val callNotif: String? = null,
     val callLook: String? = null,
     val navAutoSave: Boolean? = null
+=======
+    val callNotif: String? = null
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 )
 
 /** Mixes a hue (0..1) with a "shade" (0 = deep, 0.5 = pure, 1 = pastel) into one colour. */
@@ -211,8 +220,11 @@ fun PersonalizeScreen(
     val depth = live.depth ?: settings.buttonDepth
     val vibrate = live.vibrate ?: settings.vibrateOnButtonPress
     val callNotif = live.callNotif ?: settings.callNotifStyle
+<<<<<<< HEAD
     val callLook = live.callLook ?: settings.callNotifLook
     val navAutoSave = live.navAutoSave ?: settings.navAutoSave
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 
     val style = remember(baseStyle, glassPct, cornerPct, motionPct, hapticLv, avatar, density, navStyle, navLabels, keypad, specular, aurora, swipe, stagger) {
         baseStyle.copy(
@@ -321,6 +333,7 @@ fun PersonalizeScreen(
                 }
 
                 // ---------------------------------------------------------------- accent
+<<<<<<< HEAD
                 // ---------------------------------------------------------------- app icon
                 item(key = "icon") {
                     PCard("App icon", "The icon on your home screen. Tap one to switch; some launchers need a few seconds.", palette) {
@@ -328,6 +341,8 @@ fun PersonalizeScreen(
                     }
                 }
 
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                 item(key = "accent") {
                     PCard("Accent colour", "Tints buttons, highlights and the selected tab. Drag the sliders and watch the preview.", palette) {
                         val current = live.accent ?: settings.accentOverrideArgb
@@ -409,12 +424,21 @@ fun PersonalizeScreen(
                         LiveSlider("Frosting", "$glassPct%", glassPct.toFloat(), 0f, 100f, palette,
                             onLive = { live = live.copy(glass = it.roundToInt()) },
                             onCommit = { live = live.copy(glass = it.roundToInt()); onInt(PKey.GLASS, it.roundToInt()) })
+<<<<<<< HEAD
                         PrefSwitchRow("Light edge", "A thin highlight along the top edge of glass surfaces", specular, palette) {
                             live = live.copy(specular = it); onBool(PKey.SPECULAR, it)
                         }
                         PrefSwitchRow(
                             "Background light",
                             if (palette.glass) "Soft pale light behind the glass. Still, so it costs no battery" else "Only used by the Liquid Glass and Frost Glass themes",
+=======
+                        PrefSwitchRow("Shiny glass edge", "A bright rim that catches the light", specular, palette) {
+                            live = live.copy(specular = it); onBool(PKey.SPECULAR, it)
+                        }
+                        PrefSwitchRow(
+                            "Moving aurora light",
+                            if (palette.glass) "Soft colour drifting behind the glass" else "Only used by Liquid Glass and Frost Glass themes",
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                             aurora, palette
                         ) { live = live.copy(aurora = it); onBool(PKey.AURORA, it) }
                         Spacer(Modifier.height(6.dp))
@@ -500,6 +524,7 @@ fun PersonalizeScreen(
                         ) { live = live.copy(navLabels = it); onString(PKey.NAV_LABELS, it) }
                         Spacer(Modifier.height(14.dp))
                         Text("Order", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+<<<<<<< HEAD
                         Text("Press a tab and slide it. The preview below moves with your finger.", fontSize = 12.sp, color = palette.textSecondary)
                         Spacer(Modifier.height(8.dp))
                         NavOrderEditor(
@@ -516,6 +541,48 @@ fun PersonalizeScreen(
                             if (navAutoSave) "Saved the moment you let go of a tab" else "You tap Save order yourself",
                             navAutoSave, palette
                         ) { live = live.copy(navAutoSave = it); onBool(PKey.NAV_AUTOSAVE, it) }
+=======
+                        Text("Use the arrows to move a tab.", fontSize = 12.sp, color = palette.textSecondary)
+                        Spacer(Modifier.height(6.dp))
+                        val ordered = parseNavOrder(navOrder)
+                        ordered.forEachIndexed { i, tab ->
+                            val hidden = (tab == DialerTab.DIALER && !showDialer) || (tab == DialerTab.RECENT && !showRecent)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(palette.accentSoft.copy(alpha = if (hidden) 0.35f else 0.8f))
+                                    .padding(start = 14.dp, end = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    tab.label + if (hidden) "  (hidden)" else "",
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (hidden) palette.textSecondary else palette.textPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    enabled = i > 0,
+                                    onClick = {
+                                        val l = ordered.toMutableList(); l.removeAt(i); l.add(i - 1, tab)
+                                        val csv = serializeNavOrder(l)
+                                        live = live.copy(navOrder = csv); onString(PKey.NAV_ORDER, csv)
+                                    }
+                                ) { Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up", tint = if (i > 0) palette.textPrimary else palette.textSecondary.copy(alpha = 0.3f)) }
+                                IconButton(
+                                    enabled = i < ordered.lastIndex,
+                                    onClick = {
+                                        val l = ordered.toMutableList(); l.removeAt(i); l.add(i + 1, tab)
+                                        val csv = serializeNavOrder(l)
+                                        live = live.copy(navOrder = csv); onString(PKey.NAV_ORDER, csv)
+                                    }
+                                ) { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move down", tint = if (i < ordered.lastIndex) palette.textPrimary else palette.textSecondary.copy(alpha = 0.3f)) }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                         PrefSwitchRow("Show Dialer in the bar", "Turn off to open the dialer only from the floating button", showDialer, palette) {
                             live = live.copy(navShowDialer = it); onBool(PKey.NAV_SHOW_DIALER, it)
                         }
@@ -579,11 +646,16 @@ fun PersonalizeScreen(
                         Spacer(Modifier.height(10.dp))
                         Text("Call notification", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                         Text(
+<<<<<<< HEAD
                             "System style lets Android show its own call chip in the status bar on phones that support it. Custom card is this app's own notification.",
+=======
+                            "System style lets Android show the green call chip in the status bar on phones that support it. Glass style is the themed card.",
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                             fontSize = 12.sp,
                             color = palette.textSecondary
                         )
                         Spacer(Modifier.height(6.dp))
+<<<<<<< HEAD
                         Segmented(listOf("auto" to "Auto", "system" to "System", "glass" to "Custom card"), callNotif, palette) {
                             live = live.copy(callNotif = it); onString(PKey.CALL_NOTIF, it)
                         }
@@ -599,6 +671,11 @@ fun PersonalizeScreen(
                             listOf("classic" to "Classic", "dark" to "Dark", "light" to "Light", "themed" to "Themed", "minimal" to "Slim"),
                             callLook, palette
                         ) { live = live.copy(callLook = it); onString(PKey.CALL_NOTIF_LOOK, it) }
+=======
+                        Segmented(listOf("auto" to "Auto", "system" to "System", "glass" to "Glass card"), callNotif, palette) {
+                            live = live.copy(callNotif = it); onString(PKey.CALL_NOTIF, it)
+                        }
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     }
                 }
 

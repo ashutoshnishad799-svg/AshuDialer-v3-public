@@ -130,6 +130,7 @@ object CloudSync {
         return queued
     }
 
+<<<<<<< HEAD
     /**
      * Uploads that are already queued keep the network / charging rules they were queued with (see KEEP in [enqueue]).
      * So a recording saved while "Wi-Fi only" was ON went on waiting for Wi-Fi even after the person turned it OFF,
@@ -143,6 +144,8 @@ object CloudSync {
         return backUpAll(app, files, uriFor)
     }
 
+=======
+>>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     /** Schedules (once) the periodic check that catches recordings that never got backed up. */
     fun ensureSweepScheduled(context: Context) {
         val app = context.applicationContext
