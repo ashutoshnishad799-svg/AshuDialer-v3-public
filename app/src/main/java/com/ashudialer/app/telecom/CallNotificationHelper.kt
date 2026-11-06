@@ -42,7 +42,6 @@ object CallNotificationHelper {
     @Volatile
     var callStyleMode: String = "auto"
 
-<<<<<<< HEAD
     /**
      * Which card the custom call notification wears (Personalize > Calls > Notification look):
      *  classic  - flat card that follows the app's light / dark theme (default)
@@ -55,8 +54,6 @@ object CallNotificationHelper {
     @Volatile
     var callLook: String = "classic"
 
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     // v4 FIX ("seconds start running before I even pick up"): the ongoing-call notification used to
     // start its chronometer the moment an OUTGOING call began dialing, so the timer ran while the
     // other phone was still ringing. The timer now starts only once the call is really connected
@@ -433,14 +430,8 @@ object CallNotificationHelper {
                 builder.setUsesChronometer(false).setShowWhen(false)
             }
 
-<<<<<<< HEAD
             // Xiaomi's own software (MIUI / HyperOS) only; Xiaomi hardware running AOSP gets the system call style.
             val isXiaomiFamily = OemPermissionHelper.isLikelyMiui()
-=======
-            val isXiaomiFamily = Build.MANUFACTURER.equals("xiaomi", true) ||
-                Build.MANUFACTURER.equals("redmi", true) ||
-                Build.MANUFACTURER.equals("poco", true)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 
             val useSystemCallStyle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && when (callStyleMode) {
                 "system" -> true
@@ -451,13 +442,8 @@ object CallNotificationHelper {
                 builder
                     .setStyle(NotificationCompat.DecoratedCustomViewStyle())
                     .setCustomContentView(compactViews)
-<<<<<<< HEAD
                     .setCustomBigContentView(if (callLook == "minimal") compactViews else views)
                     .setCustomHeadsUpContentView(if (callLook == "minimal") compactViews else views)
-=======
-                    .setCustomBigContentView(views)
-                    .setCustomHeadsUpContentView(views)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     .setContentTitle(callerName)
                     .setContentText(statusLabel)
                     .build()
@@ -485,13 +471,8 @@ object CallNotificationHelper {
                 builder
                     .setStyle(NotificationCompat.DecoratedCustomViewStyle())
                     .setCustomContentView(compactViews)
-<<<<<<< HEAD
                     .setCustomBigContentView(if (callLook == "minimal") compactViews else views)
                     .setCustomHeadsUpContentView(if (callLook == "minimal") compactViews else views)
-=======
-                    .setCustomBigContentView(views)
-                    .setCustomHeadsUpContentView(views)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     .setContentTitle(callerName)
                     .setContentText(statusLabel)
                     .build()
@@ -636,10 +617,7 @@ object CallNotificationHelper {
     private data class NotificationThemeStyle(
         val backgroundRes: Int,
         val activePillRes: Int,
-<<<<<<< HEAD
         val neutralPillRes: Int,
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         val primaryText: Int,
         val secondaryText: Int
     )
@@ -658,7 +636,6 @@ object CallNotificationHelper {
         val systemIsDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
         val resolvedId = com.ashudialer.app.ui.theme.resolveThemeId(themeId, systemIsDark)
         val palette = com.ashudialer.app.ui.theme.paletteById(resolvedId)
-<<<<<<< HEAD
 
         // Every look except "themed" is a flat neutral card: no tint, no gradient, no glow.
         if (callLook != "themed") {
@@ -676,8 +653,6 @@ object CallNotificationHelper {
             )
         }
 
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         val bg = when (resolvedId) {
             "gradient" -> R.drawable.bg_notification_theme_gradient
             "midnight" -> R.drawable.bg_notification_theme_midnight
@@ -709,10 +684,7 @@ object CallNotificationHelper {
         return NotificationThemeStyle(
             backgroundRes = bg,
             activePillRes = active,
-<<<<<<< HEAD
             neutralPillRes = R.drawable.bg_notification_pill_neutral,
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             primaryText = palette.textPrimary.toArgb(),
             secondaryText = palette.textSecondary.toArgb()
         )
@@ -785,11 +757,7 @@ object CallNotificationHelper {
             views.setTextViewText(R.id.notif_btn_mute_label, if (muted) "Muted" else "Mute")
             views.setInt(
                 R.id.notif_btn_speaker, "setBackgroundResource",
-<<<<<<< HEAD
                 if (currentRoute == AudioRoute.EARPIECE) style.neutralPillRes else style.activePillRes
-=======
-                if (currentRoute == AudioRoute.EARPIECE) R.drawable.bg_notification_pill_neutral else style.activePillRes
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             )
             views.setImageViewResource(
                 R.id.notif_btn_speaker_icon,
@@ -797,11 +765,7 @@ object CallNotificationHelper {
             )
             views.setInt(
                 R.id.notif_btn_mute, "setBackgroundResource",
-<<<<<<< HEAD
                 if (muted) style.activePillRes else style.neutralPillRes
-=======
-                if (muted) style.activePillRes else R.drawable.bg_notification_pill_neutral
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             )
         }
         return views

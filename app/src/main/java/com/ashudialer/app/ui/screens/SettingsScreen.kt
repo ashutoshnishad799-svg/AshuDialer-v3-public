@@ -552,7 +552,6 @@ private fun TroubleshootingRows(
         anyRow = true
         NavRow(Icons.Filled.Settings, "Bluetooth headset audio", state(bluetoothOk, on = "Allowed", off = "Off. Tap to allow"), palette, onRequestBluetooth)
     }
-<<<<<<< HEAD
     // Battery is useful on EVERY ROM, so it is always here (next to Full screen calls and Bluetooth).
     anyRow = true
     NavRow(Icons.Filled.Build, "Battery: keep running in background", "Tap to check", palette) { oem.openAppBatterySettings(context) }
@@ -562,14 +561,6 @@ private fun TroubleshootingRows(
         NavRow(Icons.Filled.Settings, "Xiaomi: Show on Lock screen", state(miuiLock), palette) { oem.openMiuiPermissionEditor(context) }
         NavRow(Icons.Filled.Settings, "Xiaomi: Open new windows while running in the background", state(miuiBg), palette) { oem.openMiuiPermissionEditor(context) }
         NavRow(Icons.Filled.Settings, "Xiaomi: Autostart", "Tap to check", palette) { oem.openMiuiAutostartSettings(context) }
-=======
-    if (miui) {
-        anyRow = true
-        NavRow(Icons.Filled.Settings, "Xiaomi: Show on Lock screen", state(miuiLock), palette) { oem.openMiuiPermissionEditor(context) }
-        NavRow(Icons.Filled.Settings, "Xiaomi: Open new windows while running in the background", state(miuiBg), palette) { oem.openMiuiPermissionEditor(context) }
-        NavRow(Icons.Filled.Settings, "Xiaomi: Autostart", "Tap to check", palette) { oem.openMiuiAutostartSettings(context) }
-        NavRow(Icons.Filled.Build, "Battery: keep running in background", "Tap to check", palette) { oem.openAppBatterySettings(context) }
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         NavRow(
             Icons.Filled.Settings,
             "Two missed-call alerts?",

@@ -111,12 +111,8 @@ fun FloatingQuickAccess(
             Box(
                 Modifier
                     .fillMaxSize()
-<<<<<<< HEAD
                     // 0.84 hid the page completely. Now the recent calls and their numbers stay readable behind the window.
                     .background(palette.solidBackground.copy(alpha = 0.50f))
-=======
-                    .background(palette.solidBackground.copy(alpha = 0.84f))
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -134,11 +130,7 @@ fun FloatingQuickAccess(
                 fadeOut(tween(style.ms(140))),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-<<<<<<< HEAD
             FloatingWindowFrame(palette, heightFraction = 0.72f, bottomGap = if (showRecentsFab && showDialerFab) 132.dp else 78.dp) {
-=======
-            FloatingWindowFrame(palette, heightFraction = 0.75f, bottomGap = if (showRecentsFab && showDialerFab) 132.dp else 78.dp) {
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                 dialerContent()
             }
         }
@@ -189,12 +181,8 @@ private fun FloatingWindowFrame(
             .fillMaxWidth()
             .fillMaxHeight(heightFraction)
             .padding(start = 12.dp, end = 12.dp, bottom = bottomGap)
-<<<<<<< HEAD
             // A calmer corner (24dp, was 30dp) and a see-through pane (0.62, was 0.84): real frosted glass over the page.
             .liquidGlass(palette, RoundedCornerShape(24.dp), tintAlpha = 0.62f)
-=======
-            .liquidGlass(palette, RoundedCornerShape(30.dp), tintAlpha = 0.84f)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             // touches inside the window must never fall through to the backdrop (which would close it)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
     ) {
@@ -221,13 +209,8 @@ private fun QuickButton(
         modifier = Modifier
             .size(sizeDp.dp)
             .clip(CircleShape)
-<<<<<<< HEAD
             .background(palette.accent)
             .border(1.dp, Color.White.copy(alpha = 0.28f), CircleShape)
-=======
-            .background(Brush.linearGradient(listOf(palette.accent, palette.accent.copy(alpha = 0.82f))))
-            .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             .bounceClick(pressedScale = 0.92f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

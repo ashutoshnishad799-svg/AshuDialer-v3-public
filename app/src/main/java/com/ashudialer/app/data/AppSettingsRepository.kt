@@ -154,10 +154,7 @@ data class AppSettings(
     /** Keep the Dialer tab in the bottom bar (default). When off, the floating button is the way in. */
     val navShowDialer: Boolean = true,
     val navShowRecent: Boolean = true,
-<<<<<<< HEAD
     val navAutoSave: Boolean = true,
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     /** The round floating button above the bar: Dialer on Recents, Recents on the other tabs. */
     val quickFab: Boolean = true,
     /** Tapping Dialer opens a floating glass window instead of switching to the dialer page. */
@@ -167,13 +164,9 @@ data class AppSettings(
     /** classic | compact | glass */
     val dialerLayout: String = "classic",
     /** auto | system | glass - see CallNotificationHelper.callStyleMode */
-<<<<<<< HEAD
     val callNotifStyle: String = "auto",
     /** classic | dark | light | themed | minimal - see CallNotificationHelper.callLook */
     val callNotifLook: String = "classic"
-=======
-    val callNotifStyle: String = "auto"
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 )
 
 /** Keys of the generic Personalize / Recordings-UI preferences (stored as "p_<name>"). */
@@ -202,12 +195,9 @@ object PKey {
     const val DIALER_WIDE = "dialer_wide"
     const val DIALER_LAYOUT = "dialer_layout"
     const val CALL_NOTIF = "call_notif"
-<<<<<<< HEAD
     const val CALL_NOTIF_LOOK = "call_notif_look"
     /** Personalize > Bottom bar: store the tab order the moment a drag ends (default), or wait for Save. */
     const val NAV_AUTOSAVE = "nav_autosave"
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 }
 
 /** Everything the person tuned in Personalize, as one object every screen can read via LocalAshuStyle. */
@@ -341,11 +331,8 @@ class AppSettingsRepository(private val context: Context) {
             dialerBoxWide = prefs[pBool(PKey.DIALER_WIDE)] ?: false,
             dialerLayout = prefs[pStr(PKey.DIALER_LAYOUT)] ?: "classic",
             callNotifStyle = prefs[pStr(PKey.CALL_NOTIF)] ?: "auto",
-<<<<<<< HEAD
             callNotifLook = prefs[pStr(PKey.CALL_NOTIF_LOOK)] ?: "classic",
             navAutoSave = prefs[pBool(PKey.NAV_AUTOSAVE)] ?: true,
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         )
     }
 

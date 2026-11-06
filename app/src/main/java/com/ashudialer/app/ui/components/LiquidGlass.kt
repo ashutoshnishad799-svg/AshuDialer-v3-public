@@ -23,10 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
-<<<<<<< HEAD
 import androidx.compose.ui.geometry.Offset
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -34,10 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-<<<<<<< HEAD
 import androidx.compose.ui.graphics.SolidColor
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -121,26 +115,20 @@ fun Modifier.liquidGlass(
             // width is half of what is passed here.
             val rimWidth = 2f * look.rimDp * density
             val hairWidth = 1f * density
-<<<<<<< HEAD
             // The thin light line just inside the top edge (what makes a pane read as glass). It is a straight
             // line pulled in from the rounded corners, so it never needs a second path.
             val cornerPx = if (outline is Outline.Rounded) outline.roundRect.topLeftCornerRadius.x else 0f
             val topInset = (cornerPx * 0.6f + 2f * density).coerceAtMost(size.width / 2f)
             val topY = 1.5f * density
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             onDrawBehind {
                 look.fillColor?.let { drawPath(outlinePath, color = it) }
                 look.fillBrush?.let { drawPath(outlinePath, brush = it) }
                 look.sheen?.let { drawPath(outlinePath, brush = it) }
                 drawPath(outlinePath, brush = look.rim, style = Stroke(width = rimWidth))
                 look.hairline?.let { drawPath(outlinePath, color = it, style = Stroke(width = hairWidth)) }
-<<<<<<< HEAD
                 look.topLight?.let { c ->
                     drawLine(c, Offset(topInset, topY), Offset(size.width - topInset, topY), strokeWidth = density)
                 }
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             }
         }
 }
@@ -152,12 +140,8 @@ private class GlassLook(
     val sheen: Brush?,
     val rim: Brush,
     val rimDp: Float,
-<<<<<<< HEAD
     val hairline: Color?,
     val topLight: Color? = null
-=======
-    val hairline: Color?
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 ) {
     companion object {
         fun build(
@@ -172,7 +156,6 @@ private class GlassLook(
             val dark = palette.isDark
 
             if (palette.glass) {
-<<<<<<< HEAD
                 // v2.1 "classic glass". The earlier look stacked a tinted gradient sheen and a three-stop rainbow-ish
                 // rim on every pane, which read as cartoony / AI-made and cost three gradient draws per card.
                 // Now a pane is: ONE translucent white fill (lighter at the top, a little clearer at the bottom),
@@ -183,13 +166,6 @@ private class GlassLook(
                 val bottomA = (if (dark) 0.05f + 0.07f * k else 0.42f + 0.24f * k) * boost
                 val edge = if (dark) Color.White.copy(alpha = if (specular) 0.20f else 0.12f)
                 else Color(0xFF0F1B3A).copy(alpha = if (specular) 0.12f else 0.08f)
-=======
-                // Callers that ask for a heavier pane (BottomNav passes 0.9) get a proportionally milkier one.
-                val boost = (tintAlpha / 0.55f).coerceIn(0.7f, 1.7f)
-                val topA = (if (dark) 0.075f + 0.14f * k else 0.46f + 0.36f * k) * boost
-                val bottomA = (if (dark) 0.035f + 0.075f * k else 0.32f + 0.30f * k) * boost
-                val rimBright = if (specular) (if (dark) 0.62f else 0.95f) else (if (dark) 0.22f else 0.60f)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                 return GlassLook(
                     fillColor = null,
                     fillBrush = Brush.verticalGradient(
@@ -198,30 +174,11 @@ private class GlassLook(
                             Color.White.copy(alpha = bottomA.coerceIn(0f, 0.92f))
                         )
                     ),
-<<<<<<< HEAD
                     sheen = null,
                     rim = SolidColor(edge.copy(alpha = (edge.alpha * borderAlpha).coerceIn(0f, 1f))),
                     rimDp = 1f,
                     hairline = null,
                     topLight = if (specular) Color.White.copy(alpha = if (dark) 0.14f else 0.95f) else null
-=======
-                    sheen = Brush.linearGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (dark) 0.16f else 0.35f),
-                            Color.Transparent,
-                            palette.accent.copy(alpha = if (dark) 0.07f else 0.05f)
-                        )
-                    ),
-                    rim = Brush.linearGradient(
-                        listOf(
-                            Color.White.copy(alpha = (rimBright * borderAlpha).coerceIn(0f, 1f)),
-                            Color.White.copy(alpha = (rimBright * 0.16f * borderAlpha).coerceIn(0f, 1f)),
-                            Color.White.copy(alpha = (rimBright * 0.42f * borderAlpha).coerceIn(0f, 1f))
-                        )
-                    ),
-                    rimDp = 1f,
-                    hairline = if (dark) Color.Black.copy(alpha = 0.22f) else Color(0xFF0F1B3A).copy(alpha = 0.10f)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                 )
             }
 

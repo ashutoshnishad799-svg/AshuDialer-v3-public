@@ -481,7 +481,6 @@ val LiquidGlassPalette = DialerPalette(
     displayName = "Liquid Glass",
     isDark = true,
     background = Brush.verticalGradient(
-<<<<<<< HEAD
         colors = listOf(Color(0xFF080C18), Color(0xFF0C1222), Color(0xFF0A101D))
     ),
     solidBackground = Color(0xFF0A0F1C),
@@ -490,16 +489,6 @@ val LiquidGlassPalette = DialerPalette(
     cardBackground = Color(0xFF131A2C),
     cardBorder = Color(0xFFFFFFFF).copy(alpha = 0.14f),
     navBackground = Color(0xFF0F1526),
-=======
-        colors = listOf(Color(0xFF060A18), Color(0xFF0A1230), Color(0xFF081A2C))
-    ),
-    solidBackground = Color(0xFF070C1E),
-    // Opaque on purpose: dialogs / bottom sheets read cardBackground directly and must stay legible.
-    // The glass panes themselves do NOT use it (see liquidGlass' glass branch).
-    cardBackground = Color(0xFF111A36),
-    cardBorder = Color(0xFFFFFFFF).copy(alpha = 0.22f),
-    navBackground = Color(0xFF0D1530),
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     accent = Color(0xFF7FB2FF),
     accentSoft = Color(0xFF7FB2FF).copy(alpha = 0.24f),
     textPrimary = Color(0xFFF5F8FF),
@@ -507,20 +496,12 @@ val LiquidGlassPalette = DialerPalette(
     danger = Color(0xFFFF6B6B),
     searchBackground = Color(0xFFFFFFFF).copy(alpha = 0.10f),
     avatarBackground = Color(0xFFFFFFFF).copy(alpha = 0.16f),
-<<<<<<< HEAD
     callGreen = Color(0xFF34C759),
     swatchStart = Color(0xFF131A2C),
     swatchEnd = Color(0xFF7FB2FF),
     glass = true,
     // Steel blue and indigo only (the teal and violet blobs made it look neon / greeny).
     auroraColors = listOf(Color(0xFF2A4A9A), Color(0xFF33408C), Color(0xFF1F3F66), Color(0xFF2B4C8C))
-=======
-    callGreen = Color(0xFF3DDC84),
-    swatchStart = Color(0xFF16245C),
-    swatchEnd = Color(0xFF7FB2FF),
-    glass = true,
-    auroraColors = listOf(Color(0xFF3F6BFF), Color(0xFF00BFA6), Color(0xFF8B5CF6), Color(0xFF2B7BFF))
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 )
 
 /** Light frosted glass: milky white panes over soft sky, lilac and mint light. */
@@ -528,7 +509,6 @@ val FrostGlassPalette = DialerPalette(
     id = "frost",
     displayName = "Frost Glass",
     isDark = false,
-<<<<<<< HEAD
     // Cool pearl white: no mint or lilac end any more (that green-teal tail is what made it look greeny).
     background = Brush.verticalGradient(
         colors = listOf(Color(0xFFF4F7FC), Color(0xFFEBF0F9), Color(0xFFE6ECF7))
@@ -538,15 +518,6 @@ val FrostGlassPalette = DialerPalette(
     // A real hairline: the old translucent-white border was invisible on white panes and dividers.
     cardBorder = Color(0xFF0F1B3A).copy(alpha = 0.10f),
     navBackground = Color(0xFFF5F8FD),
-=======
-    background = Brush.verticalGradient(
-        colors = listOf(Color(0xFFEAF3FF), Color(0xFFE4E8FF), Color(0xFFDDF4F1))
-    ),
-    solidBackground = Color(0xFFE6EEFF),
-    cardBackground = Color(0xFFFFFFFF),
-    cardBorder = Color(0xFFFFFFFF).copy(alpha = 0.75f),
-    navBackground = Color(0xFFF3F7FF),
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     accent = Color(0xFF2F6BFF),
     accentSoft = Color(0xFF2F6BFF).copy(alpha = 0.14f),
     textPrimary = Color(0xFF0F1B3A),
@@ -555,18 +526,11 @@ val FrostGlassPalette = DialerPalette(
     searchBackground = Color(0xFFFFFFFF).copy(alpha = 0.7f),
     avatarBackground = Color(0xFFFFFFFF).copy(alpha = 0.8f),
     callGreen = Color(0xFF22B55A),
-<<<<<<< HEAD
     swatchStart = Color(0xFFF4F7FC),
     swatchEnd = Color(0xFF2F6BFF),
     glass = true,
     // Pale blue-greys only, no mint.
     auroraColors = listOf(Color(0xFFC9D8F4), Color(0xFFD7DCF2), Color(0xFFD1DFF2), Color(0xFFE1E8F7))
-=======
-    swatchStart = Color(0xFFEAF3FF),
-    swatchEnd = Color(0xFF2F6BFF),
-    glass = true,
-    auroraColors = listOf(Color(0xFF8FB8FF), Color(0xFFC4B5FD), Color(0xFF8EE6D3), Color(0xFFA5C8FF))
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 )
 
 /** Warm graphite with a restrained gold accent - quiet, premium, no colour noise. */

@@ -1028,7 +1028,6 @@ private fun SwipeableCallRow(
     var armed by remember { mutableStateOf(false) }
     val level = style.hapticLevel
 
-<<<<<<< HEAD
     // v2.1: the row only starts sliding after the finger has travelled twice the usual touch slop sideways. A
     // slightly diagonal scroll used to be enough to nudge rows left or right while scrolling the list.
     val baseConfig = androidx.compose.ui.platform.LocalViewConfiguration.current
@@ -1038,8 +1037,6 @@ private fun SwipeableCallRow(
         }
     }
 
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     Box(Modifier.fillMaxWidth().onSizeChanged { widthPx = it.width }) {
         val x = offset.value
         if (x != 0f) {
@@ -1061,10 +1058,7 @@ private fun SwipeableCallRow(
                 )
             }
         }
-<<<<<<< HEAD
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalViewConfiguration provides roomyConfig) {
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         Box(
             Modifier
                 .graphicsLayer { translationX = offset.value }
@@ -1095,7 +1089,6 @@ private fun SwipeableCallRow(
                         }
                     )
                 }
-<<<<<<< HEAD
         ) {
             // Everything inside the row (taps, long-press, buttons) keeps the normal slop.
             androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalViewConfiguration provides baseConfig) {
@@ -1103,8 +1096,5 @@ private fun SwipeableCallRow(
             }
         }
         }
-=======
-        ) { content() }
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     }
 }

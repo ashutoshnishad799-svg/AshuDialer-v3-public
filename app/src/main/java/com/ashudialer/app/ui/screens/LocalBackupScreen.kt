@@ -49,7 +49,6 @@ fun LocalBackupScreen(
     onConfirmImport: (pin: String) -> Unit,
     statusMessage: String?,
     isBusy: Boolean,
-<<<<<<< HEAD
     modifier: Modifier = Modifier,
     backupFolderLabel: String? = null,
     onChangeBackupFolder: () -> Unit = {}
@@ -57,11 +56,6 @@ fun LocalBackupScreen(
     val palette = LocalDialerPalette.current
     // Re-read after "Change folder" so the line under the button updates at once.
     var folderForgotten by remember { mutableStateOf(false) }
-=======
-    modifier: Modifier = Modifier
-) {
-    val palette = LocalDialerPalette.current
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     var mode by remember { mutableStateOf(LocalBackupMode.EXPORT) }
     var pin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
@@ -134,7 +128,6 @@ fun LocalBackupScreen(
                         if (isBusy) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                         else Text("Export Backup", fontWeight = FontWeight.SemiBold)
                     }
-<<<<<<< HEAD
                     Spacer(Modifier.height(8.dp))
                     Text(
                         if (backupFolderLabel != null && !folderForgotten) {
@@ -157,8 +150,6 @@ fun LocalBackupScreen(
                                 .padding(vertical = 8.dp)
                         )
                     }
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     if (pin.isNotEmpty() && confirmPin.isNotEmpty() && pin != confirmPin) {
                         Spacer(Modifier.height(6.dp))
                         Text("PINs don't match", fontSize = 12.sp, color = palette.danger)

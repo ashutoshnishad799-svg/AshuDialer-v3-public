@@ -23,10 +23,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
-<<<<<<< HEAD
 import androidx.compose.foundation.Image
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -77,10 +74,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
-<<<<<<< HEAD
 import androidx.compose.ui.res.painterResource
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -88,10 +82,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-<<<<<<< HEAD
 import com.ashudialer.app.R
-=======
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
 import com.ashudialer.app.ui.components.bounceClick
 import com.ashudialer.app.ui.components.liquidGlass
 import com.ashudialer.app.ui.theme.AUTO_THEME_ID
@@ -330,30 +321,16 @@ private fun WelcomeArt(color: Color, palette: DialerPalette) {
         animationSpec = infiniteRepeatable(tween(style.ms(4200).coerceAtLeast(900), easing = LinearEasing)),
         label = "welcome-ripple"
     )
-<<<<<<< HEAD
-=======
-    val sweep by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(style.ms(3800).coerceAtLeast(900), easing = LinearEasing)),
-        label = "welcome-sweep"
-    )
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     val breathe by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(style.ms(5200).coerceAtLeast(900), easing = LinearEasing), RepeatMode.Reverse),
         label = "welcome-breathe"
     )
-<<<<<<< HEAD
     // The light behind the icon is the app's blue accent, not the page's green (the green glow looked off next to the logo).
     val glow = palette.accent
     Box(Modifier.size(300.dp), contentAlignment = Alignment.Center) {
         // slow breathing light under the icon
-=======
-    Box(Modifier.size(300.dp), contentAlignment = Alignment.Center) {
-        // slow breathing light under the tile
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         Box(
             Modifier
                 .size(260.dp)
@@ -361,7 +338,6 @@ private fun WelcomeArt(color: Color, palette: DialerPalette) {
                     val s = if (on) 0.92f + 0.16f * breathe else 1f
                     scaleX = s
                     scaleY = s
-<<<<<<< HEAD
                     alpha = if (on) 0.40f + 0.30f * breathe else 0.5f
                 }
                 .background(Brush.radialGradient(listOf(glow.copy(alpha = 0.34f), Color.Transparent)))
@@ -371,23 +347,11 @@ private fun WelcomeArt(color: Color, palette: DialerPalette) {
             Box(
                 Modifier
                     .size(124.dp)
-=======
-                    alpha = if (on) 0.55f + 0.35f * breathe else 0.7f
-                }
-                .background(Brush.radialGradient(listOf(color.copy(alpha = 0.42f), Color.Transparent)))
-        )
-        // two soft echoes of the tile spreading outward
-        repeat(2) { i ->
-            Box(
-                Modifier
-                    .size(132.dp)
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
                     .graphicsLayer {
                         val p = if (on) (ripple + i * 0.5f) % 1f else 0.25f + 0.4f * i
                         val s = 1f + 0.7f * p
                         scaleX = s
                         scaleY = s
-<<<<<<< HEAD
                         alpha = (1f - p) * 0.26f
                     }
                     .border(1.5.dp, glow, RoundedCornerShape(30.dp))
@@ -407,35 +371,6 @@ private fun WelcomeArt(color: Color, palette: DialerPalette) {
                 }
                 .clip(RoundedCornerShape(28.dp))
         )
-=======
-                        alpha = (1f - p) * 0.30f
-                    }
-                    .border(1.5.dp, color, RoundedCornerShape(40.dp))
-            )
-        }
-        // the glass tile
-        Box(
-            modifier = Modifier.size(132.dp).liquidGlass(palette, RoundedCornerShape(40.dp), tintAlpha = 0.85f),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.45f)
-                    .align(Alignment.CenterStart)
-                    .graphicsLayer {
-                        translationX = (if (on) sweep * 2.6f - 0.6f else 0.4f) * size.width
-                        rotationZ = 14f
-                    }
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color.Transparent, Color.White.copy(alpha = if (palette.isDark) 0.16f else 0.40f), Color.Transparent)
-                        )
-                    )
-            )
-            Icon(Icons.Filled.Call, contentDescription = null, tint = color, modifier = Modifier.size(58.dp))
-        }
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
     }
 }
 

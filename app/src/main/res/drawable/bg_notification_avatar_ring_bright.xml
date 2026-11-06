@@ -1,25 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<<<<<<< HEAD
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="oval">
             <solid android:color="#FF4B5565" />
-=======
-<!-- Bright half of the pulse — see bg_notification_avatar_ring_dim.xml. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="oval">
-            <solid android:color="#4DB9EDE0" />
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
         </shape>
     </item>
     <item android:width="42dp" android:height="42dp" android:gravity="center">
         <shape android:shape="oval">
-<<<<<<< HEAD
             <stroke android:width="2.5dp" android:color="#E08CB4FF" />
-=======
-            <stroke android:width="2.5dp" android:color="#E07FE0D6" />
->>>>>>> e4c51b79b3e8b70a4d59613d7f5ef21885ea7436
             <solid android:color="@android:color/transparent" />
         </shape>
     </item>
