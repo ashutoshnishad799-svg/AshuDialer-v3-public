@@ -31,10 +31,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -52,6 +58,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -454,6 +464,11 @@ class MainActivity : ComponentActivity() {
             var selectedTab by launcherTabState
             // v2.0.1 floating Dialer / Recents windows (opened from the round buttons above the bar)
             var floatingDialerOpen by remember { mutableStateOf(false) }
+            // v5.1: where the bottom bar's Dialer tab is on screen and where the page area is (root coordinates).
+            // The Dialer page pops out of THAT tab - not out of the round side button.
+            var dialerTabCenter by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Unspecified) }
+            var pageTopLeft by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+            var pageSizePx by remember { mutableStateOf(IntSize.Zero) }
             var floatingRecentsOpen by remember { mutableStateOf(false) }
             var recordingGuideOpenedFromSettings by remember { mutableStateOf(false) }
             // Which screen opened the recording guide, so Back returns THERE. It used to always return to the
@@ -1209,16 +1224,15 @@ class MainActivity : ComponentActivity() {
                                 DialerBottomNav(
                                     selected = selectedTab,
                                     tabs = navTabs,
+                                    onTabCenter = { tab, center ->
+                                        if (tab == DialerTab.DIALER && center != dialerTabCenter) dialerTabCenter = center
+                                    },
                                     onSelect = { tab ->
-                                        if (tab == DialerTab.DIALER && settings.dialerFloating) {
-                                            // Personalize > Dialer: open as a floating glass window instead of a page
-                                            floatingRecentsOpen = false
-                                            floatingDialerOpen = !floatingDialerOpen
-                                        } else {
-                                            floatingDialerOpen = false
-                                            floatingRecentsOpen = false
-                                            selectedTab = tab
-                                        }
+                                        // v5.1: the Dialer tab always opens the normal Dialer page, in its own place (it
+                                        // no longer opens a floating card - that is the round side button's job).
+                                        floatingDialerOpen = false
+                                        floatingRecentsOpen = false
+                                        selectedTab = tab
                                     }
                                 )
                             }
@@ -1278,23 +1292,61 @@ class MainActivity : ComponentActivity() {
                                 targetState = selectedTab,
                                 modifier = Modifier
                                     .weight(1f)
+                                    .onGloballyPositioned { coords ->
+                                        pageTopLeft = coords.positionInRoot()
+                                        pageSizePx = coords.size
+                                    }
                                     .blockInteractionWhen(overlay != OverlayScreen.NONE || callHistoryPageContact != null || selectedContactForDetail != null || unknownNumberForDetail != null),
                                 // The screen slides and fades in the direction of travel: a tab to the right of the current
                                 // one arrives from the right. Sliding along the bottom bar crosses several tabs, and each
                                 // switch plays this animation, so the page follows the finger.
                                 transitionSpec = {
-                                    val forward = navTabs.indexOf(targetState) > navTabs.indexOf(initialState)
-                                    val distance = { fullWidth: Int -> fullWidth / 5 }
-                                    (fadeIn(tween(motionStyle.ms(240))) +
-                                        slideInHorizontally(
-                                            animationSpec = tween(motionStyle.ms(280), easing = FastOutSlowInEasing),
-                                            initialOffsetX = { w -> if (forward) distance(w) else -distance(w) }
-                                        )) togetherWith
-                                        (fadeOut(tween(motionStyle.ms(140))) +
-                                            slideOutHorizontally(
-                                                animationSpec = tween(motionStyle.ms(240), easing = FastOutSlowInEasing),
-                                                targetOffsetX = { w -> if (forward) -distance(w) else distance(w) }
-                                            ))
+                                    val popsOutOfDialerTab = settings.dialerPop && motionStyle.animationsOn &&
+                                        (targetState == DialerTab.DIALER || initialState == DialerTab.DIALER)
+                                    if (popsOutOfDialerTab) {
+                                        // v5.1: the Dialer page grows out of the bottom bar's Dialer tab with one quick
+                                        // spring and settles in its own place; leaving it, it shrinks back into the tab.
+                                        val c = dialerTabCenter
+                                        val pivot = if (!c.x.isNaN() && pageSizePx.width > 0 && pageSizePx.height > 0) {
+                                            TransformOrigin(
+                                                pivotFractionX = ((c.x - pageTopLeft.x) / pageSizePx.width).coerceIn(0f, 1f),
+                                                pivotFractionY = ((c.y - pageTopLeft.y) / pageSizePx.height).coerceAtLeast(1f)
+                                            )
+                                        } else {
+                                            TransformOrigin(0.5f, 1.1f)
+                                        }
+                                        val speed = com.ashudialer.app.ui.components.dialerSpeedFactor(settings.dialerAnimSpeed) *
+                                            motionStyle.motionScale.coerceIn(0.4f, 2f)
+                                        if (targetState == DialerTab.DIALER) {
+                                            (fadeIn(tween((140 / speed).toInt())) +
+                                                scaleIn(
+                                                    animationSpec = spring(dampingRatio = 0.86f, stiffness = 520f * speed * speed),
+                                                    initialScale = 0.30f,
+                                                    transformOrigin = pivot
+                                                )) togetherWith fadeOut(tween((100 / speed).toInt()))
+                                        } else {
+                                            (fadeIn(tween((160 / speed).toInt())) togetherWith
+                                                (fadeOut(tween((120 / speed).toInt())) +
+                                                    scaleOut(
+                                                        animationSpec = tween((170 / speed).toInt(), easing = FastOutLinearInEasing),
+                                                        targetScale = 0.30f,
+                                                        transformOrigin = pivot
+                                                    ))).apply { targetContentZIndex = -1f }
+                                        }
+                                    } else {
+                                        val forward = navTabs.indexOf(targetState) > navTabs.indexOf(initialState)
+                                        val distance = { fullWidth: Int -> fullWidth / 5 }
+                                        (fadeIn(tween(motionStyle.ms(240))) +
+                                            slideInHorizontally(
+                                                animationSpec = tween(motionStyle.ms(280), easing = FastOutSlowInEasing),
+                                                initialOffsetX = { w -> if (forward) distance(w) else -distance(w) }
+                                            )) togetherWith
+                                            (fadeOut(tween(motionStyle.ms(140))) +
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(motionStyle.ms(240), easing = FastOutSlowInEasing),
+                                                    targetOffsetX = { w -> if (forward) -distance(w) else distance(w) }
+                                                ))
+                                    }
                                 },
                                 label = "tab-content"
                             ) { tab ->
@@ -1385,23 +1437,33 @@ class MainActivity : ComponentActivity() {
                                         showSearchBar = settings.showSearchBar,
                                         modifier = Modifier.fillMaxSize()
                                     )
-                                    DialerTab.DIALER -> DialerScreen(
-                                        contacts = contacts,
-                                        onCall = { number -> buttonHaptic(); placeCall(number) },
-                                        onMessage = { number -> buttonHaptic(); sendMessage(number) },
-                                        onAddContact = { number ->
-                                            buttonHaptic()
-                                            dialerAddContactNumber = number
-                                            overlay = OverlayScreen.ADD_CONTACT
-                                        },
-                                        onAvatarClick = { contact -> selectedContactForDetail = contact },
-                                        vibrateOnButtonPress = settings.vibrateOnButtonPress,
-                                        lastCalledNumber = recents.firstOrNull()?.phoneNumber,
-                                        onVoicemail = openVoicemail,
-                                        layoutStyle = settings.dialerLayout,
-                                        wideSuggestions = settings.dialerBoxWide,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
+                                    DialerTab.DIALER -> {
+                                        // v5.1: while the page pops out of the Dialer tab its number area, keys and call
+                                        // button arrive one after another (0 -> 1 with the page's own enter transition).
+                                        val dialerEnter by transition.animateFloat(
+                                            transitionSpec = { spring(dampingRatio = 1f, stiffness = 460f) },
+                                            label = "dialer-entrance"
+                                        ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
+                                        val staggerKeys = settings.dialerPop && motionStyle.animationsOn
+                                        DialerScreen(
+                                            contacts = contacts,
+                                            onCall = { number -> buttonHaptic(); placeCall(number) },
+                                            onMessage = { number -> buttonHaptic(); sendMessage(number) },
+                                            onAddContact = { number ->
+                                                buttonHaptic()
+                                                dialerAddContactNumber = number
+                                                overlay = OverlayScreen.ADD_CONTACT
+                                            },
+                                            onAvatarClick = { contact -> selectedContactForDetail = contact },
+                                            vibrateOnButtonPress = settings.vibrateOnButtonPress,
+                                            lastCalledNumber = recents.firstOrNull()?.phoneNumber,
+                                            onVoicemail = openVoicemail,
+                                            layoutStyle = settings.dialerLayout,
+                                            wideSuggestions = settings.dialerBoxWide,
+                                            entranceProgress = if (staggerKeys) ({ dialerEnter }) else ({ 1f }),
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
                                     DialerTab.PROTECT -> ProtectScreen(
                                         blockedNumbers = blockedNumbers,
                                         onOpenBlockedNumbers = { buttonHaptic(); overlay = OverlayScreen.BLOCKED_NUMBERS },

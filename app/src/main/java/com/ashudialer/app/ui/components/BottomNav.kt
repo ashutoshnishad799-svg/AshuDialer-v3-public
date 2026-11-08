@@ -51,6 +51,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.setValue
@@ -96,7 +98,9 @@ fun DialerBottomNav(
     selected: DialerTab,
     onSelect: (DialerTab) -> Unit,
     // v2.0.1: the tabs to show, already in the person's chosen order (see visibleNavTabs)
-    tabs: List<DialerTab> = DialerTab.values().toList()
+    tabs: List<DialerTab> = DialerTab.values().toList(),
+    // v5.1: where each tab's centre is on screen (root coordinates). The Dialer page grows out of ITS tab.
+    onTabCenter: (DialerTab, androidx.compose.ui.geometry.Offset) -> Unit = { _, _ -> }
 ) {
     val palette = LocalDialerPalette.current
     val style = LocalAshuStyle.current
@@ -235,7 +239,9 @@ fun DialerBottomNav(
                         position = position,
                         palette = palette,
                         labels = style.navLabels,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .onGloballyPositioned { coords -> onTabCenter(tab, coords.boundsInRoot().center) }
                     )
                 }
             }

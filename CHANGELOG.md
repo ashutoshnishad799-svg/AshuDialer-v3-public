@@ -20,14 +20,19 @@ Modified edition of 2.1.0. Files changed since 2.1.0 are listed at the bottom (G
 - **Missed-call notification icon**: the old one was a handset with a small up-right arrow, which at status-bar size looked
   like the in-call icon. It is the standard "phone missed" glyph now (hung-up handset with an arrow bracket).
 
-### Floating dialer
-- A **solid** card (no see-through glass) that opens from the dialer button with one spring: it grows out of the button's own
+### Dialer page and floating dialer
+- **The Dialer tab opens the normal Dialer page**, in its own place - never a floating card. The page grows out of the bottom
+  bar's Dialer tab with one quick spring and settles where the page normally is (leaving it, the page shrinks back into the
+  tab); its number area, keys and call button arrive one after another. Personalize > Dialer > **Pop-up Dialer page** turns it
+  off. The old "Open dialer as a floating window" switch is gone: the floating card now belongs to the round side button only.
+- The round dialer button opens a **solid** card (no see-through glass) with one spring: it grows out of the button's own
   centre, the number, keys and call button arrive one after another, and it shrinks back into the button when closed. Dragging
   its handle down closes it. The page behind is only dimmed.
 - It rests at about **half the screen** (number, keys, call) and grows upward by itself when contact suggestions appear; the
   dialer inside never re-flows while that happens. **Nothing scrolls any more**: the key size is solved from the room available,
   and a short phone gets a taller window.
-- Personalize > Dialer: **Spring-open animation** on/off and **Dialer animation speed** (Fast / Standard / Smooth).
+- Personalize > Dialer: **Spring-open shortcut window** on/off and **Dialer animation speed** (Fast / Standard / Smooth; it
+  applies to the Dialer page and to the card).
   Personalize > Motion & touch > Animation speed now reads Off / Smooth / Standard / Fast.
 - The round shortcut buttons are solid (green for the dialer) with a soft shadow.
 
@@ -54,7 +59,7 @@ Modified edition of 2.1.0. Files changed since 2.1.0 are listed at the bottom (G
 
 ### Files changed since 2.1.0
 Changed: build.gradle.kts, MainActivity.kt, AppSettingsRepository.kt, CallNotificationHelper.kt, InCallActivity.kt,
-PixelInCallService.kt, FloatingWindows.kt, LiquidGlass.kt, ThemePicker.kt, CallScreen.kt, ContactsScreen.kt, DialerScreen.kt,
+PixelInCallService.kt, BottomNav.kt, FloatingWindows.kt, LiquidGlass.kt, ThemePicker.kt, CallScreen.kt, ContactsScreen.kt, DialerScreen.kt,
 PersonalizeScreen.kt, RecentsScreen.kt, SettingsScreen.kt, DialerColors.kt, drawable/ic_missed_call_notification.xml.
 Added: SearchHighlight.kt.
 

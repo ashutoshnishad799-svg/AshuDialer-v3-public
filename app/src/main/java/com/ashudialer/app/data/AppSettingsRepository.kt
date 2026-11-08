@@ -174,7 +174,9 @@ data class AppSettings(
     /** The floating dialer grows out of its button with a spring (on) instead of a plain fade (off). */
     val floatMorph: Boolean = true,
     /** fast | standard | smooth - how quickly the floating dialer opens, closes and builds its keys. */
-    val dialerAnimSpeed: String = "standard"
+    val dialerAnimSpeed: String = "standard",
+    /** The Dialer page grows out of the bottom bar's Dialer tab (off = the plain page change). */
+    val dialerPop: Boolean = true
 )
 
 /** Keys of the generic Personalize / Recordings-UI preferences (stored as "p_<name>"). */
@@ -208,6 +210,7 @@ object PKey {
     const val MORE_THEMES = "more_themes"
     const val FLOAT_MORPH = "float_morph"
     const val DIALER_SPEED = "dialer_anim_speed"
+    const val DIALER_POP = "dialer_pop"
     /** Personalize > Bottom bar: store the tab order the moment a drag ends (default), or wait for Save. */
     const val NAV_AUTOSAVE = "nav_autosave"
 }
@@ -348,6 +351,7 @@ class AppSettingsRepository(private val context: Context) {
             moreThemes = prefs[pBool(PKey.MORE_THEMES)] ?: false,
             floatMorph = prefs[pBool(PKey.FLOAT_MORPH)] ?: true,
             dialerAnimSpeed = prefs[pStr(PKey.DIALER_SPEED)] ?: "standard",
+            dialerPop = prefs[pBool(PKey.DIALER_POP)] ?: true,
             navAutoSave = prefs[pBool(PKey.NAV_AUTOSAVE)] ?: true,
         )
     }

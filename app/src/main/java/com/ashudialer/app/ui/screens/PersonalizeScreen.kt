@@ -134,7 +134,7 @@ private data class Live(
     val swipe: Boolean? = null,
     val stagger: Boolean? = null,
     val fab: Boolean? = null,
-    val dialerFloating: Boolean? = null,
+    val dialerPop: Boolean? = null,
     val dialerWide: Boolean? = null,
     val dialerLayout: String? = null,
     val fontSize: Int? = null,
@@ -209,7 +209,7 @@ fun PersonalizeScreen(
     val showDialer = live.navShowDialer ?: settings.navShowDialer
     val showRecent = live.navShowRecent ?: settings.navShowRecent
     val fabOn = live.fab ?: settings.quickFab
-    val dialerFloating = live.dialerFloating ?: settings.dialerFloating
+    val dialerPop = live.dialerPop ?: settings.dialerPop
     val dialerWide = live.dialerWide ?: settings.dialerBoxWide
     val dialerLayout = live.dialerLayout ?: settings.dialerLayout
     val fontSize = live.fontSize ?: settings.fontSizeIndex.coerceIn(0, 2)
@@ -549,19 +549,19 @@ fun PersonalizeScreen(
                             fabOn, palette
                         ) { live = live.copy(fab = it); onBool(PKey.QUICK_FAB, it) }
                         PrefSwitchRow(
-                            "Open dialer as a floating window",
-                            "A solid dialer card pops over the page instead of switching pages",
-                            dialerFloating, palette
-                        ) { live = live.copy(dialerFloating = it); onBool(PKey.DIALER_FLOATING, it) }
+                            "Pop-up Dialer page",
+                            "Tap the Dialer tab and the page grows out of it with a quick spring, keys arriving one by one",
+                            dialerPop, palette
+                        ) { live = live.copy(dialerPop = it); onBool(PKey.DIALER_POP, it) }
                         PrefSwitchRow(
-                            "Spring-open animation",
-                            "The floating dialer grows out of its button with a spring, key by key. Off = a quick fade",
+                            "Spring-open shortcut window",
+                            "The window from the round dialer button grows out of the button with a spring. Off = a quick fade",
                             floatMorph, palette
                         ) { live = live.copy(floatMorph = it); onBool(PKey.FLOAT_MORPH, it) }
                         Spacer(Modifier.height(6.dp))
                         Text("Dialer animation speed", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                         Text(
-                            "How quickly the floating dialer opens, closes and builds its keys.",
+                            "How quickly the Dialer page and the shortcut window open, close and build their keys.",
                             fontSize = 12.sp,
                             color = palette.textSecondary
                         )
