@@ -160,13 +160,21 @@ data class AppSettings(
     /** Tapping Dialer opens a floating glass window instead of switching to the dialer page. */
     val dialerFloating: Boolean = false,
     /** Contact suggestions under the number go edge to edge and bigger. */
-    val dialerBoxWide: Boolean = false,
+    val dialerBoxWide: Boolean = true,
     /** classic | compact | glass */
     val dialerLayout: String = "classic",
     /** auto | system | glass - see CallNotificationHelper.callStyleMode */
     val callNotifStyle: String = "auto",
     /** classic | dark | light | themed | minimal - see CallNotificationHelper.callLook */
-    val callNotifLook: String = "classic"
+    val callNotifLook: String = "classic",
+    /** "Add call" -> the new call answers -> it is joined into the conference automatically (no second tap). */
+    val autoMergeCalls: Boolean = true,
+    /** Hides Emerald / Obsidian Gold / Midnight / Rainbow / Violet / Sunset from the theme list until switched on. */
+    val moreThemes: Boolean = false,
+    /** The floating dialer grows out of its button with a spring (on) instead of a plain fade (off). */
+    val floatMorph: Boolean = true,
+    /** fast | standard | smooth - how quickly the floating dialer opens, closes and builds its keys. */
+    val dialerAnimSpeed: String = "standard"
 )
 
 /** Keys of the generic Personalize / Recordings-UI preferences (stored as "p_<name>"). */
@@ -196,6 +204,10 @@ object PKey {
     const val DIALER_LAYOUT = "dialer_layout"
     const val CALL_NOTIF = "call_notif"
     const val CALL_NOTIF_LOOK = "call_notif_look"
+    const val AUTO_MERGE = "auto_merge_calls"
+    const val MORE_THEMES = "more_themes"
+    const val FLOAT_MORPH = "float_morph"
+    const val DIALER_SPEED = "dialer_anim_speed"
     /** Personalize > Bottom bar: store the tab order the moment a drag ends (default), or wait for Save. */
     const val NAV_AUTOSAVE = "nav_autosave"
 }
@@ -328,10 +340,14 @@ class AppSettingsRepository(private val context: Context) {
             navShowRecent = prefs[pBool(PKey.NAV_SHOW_RECENT)] ?: true,
             quickFab = prefs[pBool(PKey.QUICK_FAB)] ?: true,
             dialerFloating = prefs[pBool(PKey.DIALER_FLOATING)] ?: false,
-            dialerBoxWide = prefs[pBool(PKey.DIALER_WIDE)] ?: false,
+            dialerBoxWide = prefs[pBool(PKey.DIALER_WIDE)] ?: true,
             dialerLayout = prefs[pStr(PKey.DIALER_LAYOUT)] ?: "classic",
             callNotifStyle = prefs[pStr(PKey.CALL_NOTIF)] ?: "auto",
             callNotifLook = prefs[pStr(PKey.CALL_NOTIF_LOOK)] ?: "classic",
+            autoMergeCalls = prefs[pBool(PKey.AUTO_MERGE)] ?: true,
+            moreThemes = prefs[pBool(PKey.MORE_THEMES)] ?: false,
+            floatMorph = prefs[pBool(PKey.FLOAT_MORPH)] ?: true,
+            dialerAnimSpeed = prefs[pStr(PKey.DIALER_SPEED)] ?: "standard",
             navAutoSave = prefs[pBool(PKey.NAV_AUTOSAVE)] ?: true,
         )
     }

@@ -367,6 +367,8 @@ class InCallActivity : ComponentActivity() {
             // callback (that race was the actual cause of the two
             // buttons visibly falling out of sync with each other).
             val isMuted by PixelInCallService.isMutedFlow.collectAsState()
+            // v5: true from the Merge tap until the conference really exists ("Merging..." on the button).
+            val mergePending by PixelInCallService.mergePendingFlow.collectAsState()
             // See NativeVideoCallScreen's own doc comment for what this
             // actually renders once true, and onUpgradeToNativeVideo's doc
             // comment (below, in this same file) for the request that
@@ -854,20 +856,18 @@ class InCallActivity : ComponentActivity() {
                         current.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
                     val confOwner = current.details?.can(Call.Details.CAPABILITY_MANAGE_CONFERENCE) == true ||
                         current.details?.callDirection != Call.Details.DIRECTION_INCOMING
+                    // v5: the first value is built straight away from the numbers (so the list is on screen the
+                    // instant the conference forms); saved names are filled in as soon as the lookups return.
+                    // An unsaved person is shown by NUMBER ONLY - never by a carrier-supplied name.
                     val confParticipants by produceState(
-                        emptyList<com.ashudialer.app.ui.screens.ConferenceParticipantUi>(),
+                        confMembers.map { conferenceParticipantUi(it, null, confOwner) },
                         confMembers.size,
                         callTick
                     ) {
                         value = confMembers.map { m ->
                             val n = m.details?.handle?.schemeSpecificPart.orEmpty()
                             val saved = if (n.isNotBlank()) app.contactsRepository.lookupNameForNumber(n)?.displayName else null
-                            com.ashudialer.app.ui.screens.ConferenceParticipantUi(
-                                name = saved ?: m.details?.callerDisplayName?.takeIf { it.isNotBlank() } ?: n.ifBlank { "Participant" },
-                                number = n,
-                                canRemove = confOwner || m.details?.can(Call.Details.CAPABILITY_DISCONNECT_FROM_CONFERENCE) == true,
-                                canSplit = m.details?.can(Call.Details.CAPABILITY_SEPARATE_FROM_CONFERENCE) == true
-                            )
+                            conferenceParticipantUi(m, saved, confOwner)
                         }
                     }
                     val secondary = PixelInCallService.secondaryCall
@@ -1018,6 +1018,10 @@ class InCallActivity : ComponentActivity() {
                                 conferenceParticipants = if (isConference) confParticipants else emptyList(),
                                 onRemoveParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.removeFromConference(it) } },
                                 onSplitParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.splitFromConference(it) } },
+                                onHoldParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.toggleHoldParticipant(it) } },
+                                canHold = (callState == Call.STATE_ACTIVE || callState == Call.STATE_HOLDING) &&
+                                    current.details?.can(Call.Details.CAPABILITY_HOLD) == true,
+                                isMergePending = mergePending,
                                 callerPhotoUri = localContactMatch?.photoUri,
                                 isConnected = callState == Call.STATE_ACTIVE,
                                 isOnHold = callState == Call.STATE_HOLDING,
@@ -1238,6 +1242,9 @@ class InCallActivity : ComponentActivity() {
                                                 runCatching { existing.hold() }
                                             }
                                         }
+                                        // v5: once this new call answers it is joined into the conference by itself
+                                        // (Personalize > Calls > "Auto-merge added calls", on by default).
+                                        PixelInCallService.armAutoMerge()
                                         DialerPermissions.placeCall(this@InCallActivity, secondNumber)
                                     }
                                 )
@@ -1372,4 +1379,23 @@ class InCallActivity : ComponentActivity() {
          */
         const val EXTRA_AUTO_ANSWER = "com.ashudialer.app.EXTRA_AUTO_ANSWER"
     }
+}
+
+/** One conference member as the call screen shows it: the saved name if there is one, otherwise ONLY the number. */
+private fun conferenceParticipantUi(
+    m: Call,
+    savedName: String?,
+    confOwner: Boolean
+): com.ashudialer.app.ui.screens.ConferenceParticipantUi {
+    val n = m.details?.handle?.schemeSpecificPart.orEmpty()
+    val isSaved = !savedName.isNullOrBlank()
+    return com.ashudialer.app.ui.screens.ConferenceParticipantUi(
+        name = if (isSaved) savedName.orEmpty() else n.ifBlank { "Unknown number" },
+        number = n,
+        canRemove = confOwner || m.details?.can(Call.Details.CAPABILITY_DISCONNECT_FROM_CONFERENCE) == true,
+        canSplit = m.details?.can(Call.Details.CAPABILITY_SEPARATE_FROM_CONFERENCE) == true,
+        isSaved = isSaved,
+        isOnHold = m.state == Call.STATE_HOLDING,
+        canHold = m.details?.can(Call.Details.CAPABILITY_HOLD) == true
+    )
 }

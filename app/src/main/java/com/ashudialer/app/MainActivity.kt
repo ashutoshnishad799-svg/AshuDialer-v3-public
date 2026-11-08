@@ -1513,7 +1513,9 @@ class MainActivity : ComponentActivity() {
                                     onToggleDialer = { floatingRecentsOpen = false; floatingDialerOpen = !floatingDialerOpen },
                                     onToggleRecents = { floatingDialerOpen = false; floatingRecentsOpen = !floatingRecentsOpen },
                                     onDismiss = { floatingDialerOpen = false; floatingRecentsOpen = false },
-                                    dialerContent = {
+                                    springOpen = settings.floatMorph,
+                                    speed = com.ashudialer.app.ui.components.dialerSpeedFactor(settings.dialerAnimSpeed),
+                                    dialerContent = { entrance, onInfo ->
                                         DialerScreen(
                                             contacts = contacts,
                                             onCall = { number -> buttonHaptic(); floatingDialerOpen = false; placeCall(number) },
@@ -1530,6 +1532,8 @@ class MainActivity : ComponentActivity() {
                                             onVoicemail = { floatingDialerOpen = false; openVoicemail() },
                                             layoutStyle = settings.dialerLayout,
                                             wideSuggestions = settings.dialerBoxWide,
+                                            entranceProgress = entrance,
+                                            onWindowInfo = onInfo,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     },
@@ -2509,7 +2513,8 @@ class MainActivity : ComponentActivity() {
                         ThemePickerSheet(
                             currentThemeId = themeId,
                             onSelect = { id -> viewModel.setTheme(id) },
-                            onDismiss = { showThemePicker = false }
+                            onDismiss = { showThemePicker = false },
+                            showMoreThemes = settings.moreThemes
                         )
                     }
 

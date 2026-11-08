@@ -59,7 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ashudialer.app.ui.theme.AUTO_THEME_ID
-import com.ashudialer.app.ui.theme.AllPalettes
+import com.ashudialer.app.ui.theme.visiblePalettes
 import com.ashudialer.app.ui.theme.DialerPalette
 import com.ashudialer.app.ui.theme.LocalAshuStyle
 import com.ashudialer.app.ui.theme.LocalDialerPalette
@@ -118,12 +118,13 @@ private val themeFilters = listOf("All", "Light", "Dark", "Glass")
 fun ThemePickerSheet(
     currentThemeId: String,
     onSelect: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    showMoreThemes: Boolean = false
 ) {
     val palette = LocalDialerPalette.current
     var filter by remember { mutableIntStateOf(0) }
-    val shown = remember(filter) {
-        AllPalettes.filter {
+    val shown = remember(filter, showMoreThemes, currentThemeId) {
+        visiblePalettes(showMoreThemes, currentThemeId).filter {
             when (filter) {
                 1 -> !it.isDark
                 2 -> it.isDark
@@ -181,6 +182,14 @@ fun ThemePickerSheet(
                         modifier = Modifier.staggerIn(index + 1)
                     ) { onSelect(p.id) }
                 }
+            }
+            if (!showMoreThemes) {
+                Text(
+                    "More colour themes: Personalize > Theme > Show more colour themes",
+                    fontSize = 12.sp,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
             }
         }
     }

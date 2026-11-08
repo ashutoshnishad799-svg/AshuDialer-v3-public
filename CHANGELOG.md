@@ -1,5 +1,63 @@
 # Changelog
 
+## 2.2.0 - 8 November 2026  (conference calls, floating dialer, search)
+
+Modified edition of 2.1.0. Files changed since 2.1.0 are listed at the bottom (GPL section 5(a)).
+
+### Conference calls
+- **Merge** is a large button on the call screen and reads "Merging..." the moment it is tapped. When Telecom is not ready to
+  join the two calls yet, the request is remembered and retried every 100 ms (up to 6 s) instead of being dropped.
+- **Auto-merge**: after Add call, the new call is joined into the conference as soon as it answers (Personalize > Calls >
+  Auto-merge added calls, on by default).
+- **The people in the call** are listed in the middle of the screen: the saved name, or ONLY the number for someone who is not
+  saved (a carrier-supplied name is no longer shown). Each person reads Talking or On hold. Per person: Hold / Resume (where the
+  network allows it), Private and End call. Above the list: Add person, Hold all / Resume all and End all.
+- The notification spells out the state: "Conference . 3 people" and "Conference on hold . 3 people".
+
+### Calls
+- **Hold** is a button in the main row (it used to be inside More). It lights up and reads "On hold" while the call is held, and
+  the status under the name is a pulsing "On hold" badge instead of small grey text.
+- **Missed-call notification icon**: the old one was a handset with a small up-right arrow, which at status-bar size looked
+  like the in-call icon. It is the standard "phone missed" glyph now (hung-up handset with an arrow bracket).
+
+### Floating dialer
+- A **solid** card (no see-through glass) that opens from the dialer button with one spring: it grows out of the button's own
+  centre, the number, keys and call button arrive one after another, and it shrinks back into the button when closed. Dragging
+  its handle down closes it. The page behind is only dimmed.
+- It rests at about **half the screen** (number, keys, call) and grows upward by itself when contact suggestions appear; the
+  dialer inside never re-flows while that happens. **Nothing scrolls any more**: the key size is solved from the room available,
+  and a short phone gets a taller window.
+- Personalize > Dialer: **Spring-open animation** on/off and **Dialer animation speed** (Fast / Standard / Smooth).
+  Personalize > Motion & touch > Animation speed now reads Off / Smooth / Standard / Fast.
+- The round shortcut buttons are solid (green for the dialer) with a soft shadow.
+
+### Dialer
+- The typed number sits lower. "Add to Contacts" and "Paste" moved up into the suggestions area, so the suggestions box is taller
+  (two rows whenever the keys can stay comfortable).
+- Contact suggestions are **one panel**: no divider lines, no border, edge to edge, with the top edge fading into the page.
+  (Personalize > Dialer > wide suggestions is on by default now.)
+- **Long press on the number**: Copy / Paste / Clear. A tap on it places the cursor to fix a digit. Paste keeps digits and + * #.
+- **Frost Glass**: the thin light line along the top of glass panes is gone.
+
+### Search
+- In Recents and Contacts search, the part of the name or number that was typed is coloured (the cue shown in onboarding), and
+  the number is shown on the result while searching.
+
+### Personalize and Settings
+- **Themes**: Emerald Night, Obsidian Gold, Midnight, Violet, Sunset and Rainbow are hidden until Personalize > Theme >
+  "Show more colour themes" is on (they stay listed while one of them is the theme in use). Slate stays in the main list.
+- **Frost / Liquid Glass lag**: Settings and Personalize cards use one flat translucent fill and a hairline instead of the full
+  glass paint, so the long lists scroll smoothly.
+
+### Notes
+- Version 2.2.0 (versionCode 19).
+
+### Files changed since 2.1.0
+Changed: build.gradle.kts, MainActivity.kt, AppSettingsRepository.kt, CallNotificationHelper.kt, InCallActivity.kt,
+PixelInCallService.kt, FloatingWindows.kt, LiquidGlass.kt, ThemePicker.kt, CallScreen.kt, ContactsScreen.kt, DialerScreen.kt,
+PersonalizeScreen.kt, RecentsScreen.kt, SettingsScreen.kt, DialerColors.kt, drawable/ic_missed_call_notification.xml.
+Added: SearchHighlight.kt.
+
 ## 2.1.0 - 5 November 2026  (classic look, new icons, folder backups)
 
 Modified edition of 2.0.1. Files changed since 2.0.1 are listed at the bottom (GPL section 5(a)).

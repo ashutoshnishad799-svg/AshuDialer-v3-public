@@ -98,6 +98,11 @@ fun CallScreen(
     conferenceParticipants: List<ConferenceParticipantUi> = emptyList(),
     onRemoveParticipant: (Int) -> Unit = {},
     onSplitParticipant: (Int) -> Unit = {},
+    onHoldParticipant: (Int) -> Unit = {},
+    // v5: Hold is a real button in the main row now (it used to hide inside "More"); canHold greys it out when
+    // the network does not allow holding right now. isMergePending drives the "Merging..." state of Merge.
+    canHold: Boolean = true,
+    isMergePending: Boolean = false,
     recordingAvailable: Boolean = false,
     isRecording: Boolean = false,
     // True for the window between tapping Record and the recorder actually
@@ -354,13 +359,13 @@ fun CallScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = if (isSavedContact) callerName else callerNumber,
+                    text = if (isSavedContact || conferenceParticipants.isNotEmpty()) callerName else callerNumber,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textPrimary,
                     maxLines = 1
                 )
-                if (isSavedContact && callerNumber.isNotBlank()) {
+                if ((isSavedContact || conferenceParticipants.isNotEmpty()) && callerNumber.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = callerNumber,
@@ -371,22 +376,38 @@ fun CallScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            val isConferenceCall = conferenceParticipants.isNotEmpty()
+            Spacer(Modifier.height(if (isConferenceCall) 8.dp else 16.dp))
 
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                ScallopedAvatar(
-                    name = callerName,
-                    isSavedContact = isSavedContact,
-                    photoUri = callerPhotoUri,
-                    onHold = isOnHold,
-                    palette = palette
-                )
+            if (isConferenceCall) {
+                // v5: a small group badge instead of the big avatar - the people in the call need the room.
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier.size(64.dp).clip(CircleShape).background(palette.accentSoft),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.Groups, contentDescription = null, tint = palette.accent, modifier = Modifier.size(34.dp))
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ScallopedAvatar(
+                        name = callerName,
+                        isSavedContact = isSavedContact,
+                        photoUri = callerPhotoUri,
+                        onHold = isOnHold,
+                        palette = palette
+                    )
+                }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(if (isConferenceCall) 10.dp else 24.dp))
 
             AnimatedVisibility(
                 visible = isRecording,
@@ -405,17 +426,21 @@ fun CallScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = when {
-                        isEndingCall -> "Ending call…"
-                        state == CallUiState.CONNECTING -> "Dialing…"
-                        isOnHold -> "on hold"
-                        else -> formatDuration(seconds)
-                    },
-                    fontSize = 15.sp,
-                    color = palette.textSecondary,
-                    fontWeight = FontWeight.Medium
-                )
+                if (isOnHold && !isEndingCall) {
+                    // v5: a pulsing "On hold" badge instead of tiny grey text, so it cannot be missed.
+                    HoldBadge(palette)
+                } else {
+                    Text(
+                        text = when {
+                            isEndingCall -> "Ending call…"
+                            state == CallUiState.CONNECTING -> "Dialing…"
+                            else -> formatDuration(seconds)
+                        },
+                        fontSize = 15.sp,
+                        color = palette.textSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
             if (!secondaryCallerName.isNullOrBlank()) {
@@ -448,55 +473,16 @@ fun CallScreen(
                             fontSize = 15.sp, color = palette.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1
                         )
                     }
-                    if (canMerge) {
-                        CallActionPill("Merge", palette) { onMerge() }
-                        Spacer(Modifier.width(6.dp))
-                    }
                     if (canSwap) {
                         CallActionPill("Swap", palette) { onSwap() }
                     }
                 }
             }
 
-            if (conferenceParticipants.isNotEmpty()) {
-                var showManage by remember { mutableStateOf(false) }
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 28.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(palette.cardBackground.copy(alpha = 0.55f))
-                        .border(1.dp, palette.cardBorder.copy(alpha = 0.65f), RoundedCornerShape(18.dp))
-                        .clickable { showManage = true }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Filled.Groups, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "${conferenceParticipants.size} people in this call",
-                            fontSize = 11.sp, color = palette.textSecondary, fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            conferenceParticipants.joinToString(", ") { it.name },
-                            fontSize = 15.sp, color = palette.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1
-                        )
-                    }
-                    Text("Manage", fontSize = 12.sp, color = palette.accent, fontWeight = FontWeight.Bold)
-                }
-                if (showManage) {
-                    ConferenceManageDialog(
-                        palette = palette,
-                        participants = conferenceParticipants,
-                        isOnHold = isOnHold,
-                        onToggleHold = onToggleHold,
-                        onRemove = onRemoveParticipant,
-                        onSplit = onSplitParticipant,
-                        onDismiss = { showManage = false }
-                    )
-                }
+            // v5: Merge is a big, obvious button (it was a tiny pill) and says "Merging..." the instant it is tapped.
+            if (!secondaryCallerName.isNullOrBlank() && (canMerge || isMergePending)) {
+                Spacer(Modifier.height(8.dp))
+                MergeCallsButton(palette = palette, pending = isMergePending, onClick = onMerge)
             }
 
             // ONE fixed slot for the keypad and the More sheet.
@@ -514,6 +500,27 @@ fun CallScreen(
                 contentAlignment = Alignment.BottomCenter
             ) {
                 val slotMaxHeight = maxHeight
+                // v5 conference: everyone in the call, with the host's controls, fills the middle of the screen
+                // (it used to hide behind a "Manage" popup).
+                TopPanelSlot(
+                    visible = conferenceParticipants.isNotEmpty() && !showKeypad && !showMore,
+                    modifier = Modifier.align(Alignment.TopCenter)
+                ) {
+                    Box(Modifier.heightIn(max = slotMaxHeight).verticalScroll(rememberScrollState())) {
+                        ConferencePanel(
+                            palette = palette,
+                            participants = conferenceParticipants,
+                            isOnHold = isOnHold,
+                            canHold = canHold,
+                            onAddPerson = onAddCall,
+                            onToggleHoldAll = onToggleHold,
+                            onEndAll = onEndCall,
+                            onRemove = onRemoveParticipant,
+                            onSplit = onSplitParticipant,
+                            onHoldParticipant = onHoldParticipant
+                        )
+                    }
+                }
                 PanelSlot(visible = showKeypad) {
                     Box(Modifier.heightIn(max = slotMaxHeight).verticalScroll(rememberScrollState())) {
                         InCallKeypad(
@@ -555,10 +562,10 @@ fun CallScreen(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                CallControlButton(Icons.Filled.Dialpad, "Keypad", active = showKeypad, palette = palette) {
+                CallControlButton(Icons.Filled.Dialpad, "Keypad", active = showKeypad, palette = palette, size = 62.dp) {
                     showKeypad = !showKeypad
                     if (showKeypad) showMore = false
                 }
@@ -566,7 +573,8 @@ fun CallScreen(
                     if (isMuted) Icons.Filled.MicOff else Icons.Filled.Mic,
                     if (isMuted) "Unmute" else "Mute",
                     active = isMuted,
-                    palette = palette
+                    palette = palette,
+                    size = 62.dp
                 ) { onToggleMute() }
                 var showAudioRouteMenu by remember { mutableStateOf(false) }
                 Box {
@@ -574,7 +582,8 @@ fun CallScreen(
                         icon = iconForRoute(currentAudioRoute),
                         label = if (availableAudioRoutes.size > 2) "Audio" else if (currentAudioRoute == AudioRoute.SPEAKER) "Speaker" else "Audio",
                         active = showAudioRouteMenu || currentAudioRoute == AudioRoute.SPEAKER || currentAudioRoute == AudioRoute.BLUETOOTH,
-                        palette = palette
+                        palette = palette,
+                        size = 62.dp
                     ) {
                         // With only Earpiece/Speaker available, keep the original simple
                         // toggle. Once a third route becomes available (Bluetooth or a
@@ -601,7 +610,16 @@ fun CallScreen(
                         }
                     }
                 }
-                CallControlButton(Icons.Filled.MoreHoriz, "More", active = showMore, palette = palette) {
+                // v5: Hold lives in the main row. It lights up (filled, labelled "On hold") while the call is held.
+                CallControlButton(
+                    icon = Icons.Filled.Pause,
+                    label = if (isOnHold) "On hold" else "Hold",
+                    active = isOnHold,
+                    palette = palette,
+                    size = 62.dp,
+                    enabled = canHold || isOnHold
+                ) { onToggleHold() }
+                CallControlButton(Icons.Filled.MoreHoriz, "More", active = showMore, palette = palette, size = 62.dp) {
                     showMore = !showMore
                     if (showMore) showKeypad = false
                 }
@@ -1184,6 +1202,8 @@ private fun CallControlButton(
     label: String,
     active: Boolean,
     palette: DialerPalette,
+    size: androidx.compose.ui.unit.Dp = 72.dp,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -1212,10 +1232,11 @@ private fun CallControlButton(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(
             onClick = onClick,
+            enabled = enabled,
             interactionSource = interactionSource,
             modifier = Modifier
-                .size(72.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .size(size)
+                .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (enabled) 1f else 0.4f }
                 .clip(CircleShape)
                 // Glassy look: a translucent white layer over the active/
                 // inactive fill (rather than a flat, opaque
@@ -1233,11 +1254,11 @@ private fun CallControlButton(
                 icon,
                 contentDescription = label,
                 tint = tintColor,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(if (size < 68.dp) 24.dp else 26.dp)
             )
         }
         Spacer(Modifier.height(8.dp))
-        Text(label, fontSize = 12.sp, color = palette.textSecondary, fontWeight = FontWeight.Medium)
+        Text(label, fontSize = 12.sp, color = if (active) palette.textPrimary else palette.textSecondary, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -1247,12 +1268,317 @@ private fun formatDuration(totalSeconds: Int): String {
     return "%02d:%02d".format(m, s)
 }
 
+/** A pulsing "On hold" badge under the name - the old tiny grey word was easy to miss. */
+@Composable
+private fun HoldBadge(palette: DialerPalette) {
+    val pulse = rememberInfiniteTransition(label = "hold-pulse")
+    val pulseAlpha by pulse.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "hold-pulse-alpha"
+    )
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(palette.accent.copy(alpha = 0.16f))
+            .border(1.dp, palette.accent.copy(alpha = 0.40f), shape)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Filled.Pause,
+            contentDescription = null,
+            tint = palette.accent,
+            modifier = Modifier.size(16.dp).graphicsLayer { alpha = pulseAlpha }
+        )
+        Spacer(Modifier.width(6.dp))
+        Text("On hold", fontSize = 14.sp, color = palette.accent, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Big "Merge calls" button; turns into "Merging..." with a spinner the moment it is tapped. */
+@Composable
+private fun MergeCallsButton(palette: DialerPalette, pending: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(26.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp)
+            .height(52.dp)
+            .graphicsLayer { alpha = if (pending) 0.75f else 1f }
+            .clip(shape)
+            .background(palette.accent)
+            .clickable(enabled = !pending, onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (pending) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.5.dp, color = Color.White)
+        } else {
+            Icon(Icons.Filled.CallMerge, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            if (pending) "Merging…" else "Merge calls",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+    }
+}
+
+/** Same as PanelSlot but pinned to the top of the middle area (the conference people list reads top-down). */
+@Composable
+private fun TopPanelSlot(visible: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(animationSpec = tween(200)) +
+            slideInVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 10 },
+        exit = fadeOut(animationSpec = tween(110))
+    ) {
+        content()
+    }
+}
+
+/**
+ * v5 conference: everyone in the call in plain words and big buttons - who is talking, who is on hold, and what the
+ * host can do with each person (Hold / Private / End call), plus Add person / Hold all / End all on top.
+ * An unsaved person is shown by NUMBER only.
+ */
+@Composable
+private fun ConferencePanel(
+    palette: DialerPalette,
+    participants: List<ConferenceParticipantUi>,
+    isOnHold: Boolean,
+    canHold: Boolean,
+    onAddPerson: () -> Unit,
+    onToggleHoldAll: () -> Unit,
+    onEndAll: () -> Unit,
+    onRemove: (Int) -> Unit,
+    onSplit: (Int) -> Unit,
+    onHoldParticipant: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ConfQuickAction(Icons.Filled.PersonAdd, "Add person", palette, Modifier.weight(1f)) { onAddPerson() }
+            ConfQuickAction(
+                Icons.Filled.Pause,
+                if (isOnHold) "Resume all" else "Hold all",
+                palette,
+                Modifier.weight(1f),
+                active = isOnHold,
+                enabled = canHold || isOnHold
+            ) { onToggleHoldAll() }
+            ConfQuickAction(Icons.Filled.CallEnd, "End all", palette, Modifier.weight(1f), danger = true) { onEndAll() }
+        }
+        participants.forEachIndexed { index, p ->
+            ConfParticipantRow(
+                palette = palette,
+                p = p,
+                conferenceOnHold = isOnHold,
+                onHold = { onHoldParticipant(index) },
+                onPrivate = { onSplit(index) },
+                onEnd = { onRemove(index) }
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+@Composable
+private fun ConfQuickAction(
+    icon: ImageVector,
+    label: String,
+    palette: DialerPalette,
+    modifier: Modifier = Modifier,
+    active: Boolean = false,
+    danger: Boolean = false,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    val fill = when {
+        danger -> Color(0xFFE53E3E)
+        active -> palette.accent
+        else -> palette.cardBackground
+    }
+    val content = if (danger || active) Color.White else palette.textPrimary
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
+            .clip(shape)
+            .background(fill)
+            .border(1.dp, palette.cardBorder.copy(alpha = 0.65f), shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, fontSize = 12.5.sp, color = content, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ConfParticipantRow(
+    palette: DialerPalette,
+    p: ConferenceParticipantUi,
+    conferenceOnHold: Boolean,
+    onHold: () -> Unit,
+    onPrivate: () -> Unit,
+    onEnd: () -> Unit
+) {
+    val shape = RoundedCornerShape(20.dp)
+    val held = p.isOnHold || conferenceOnHold
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(palette.cardBackground.copy(alpha = 0.55f))
+            .border(1.dp, palette.cardBorder.copy(alpha = 0.65f), shape)
+            .padding(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(palette.accentSoft),
+                contentAlignment = Alignment.Center
+            ) {
+                if (p.isSaved && p.name.isNotBlank()) {
+                    Text(
+                        p.name.first().uppercaseChar().toString(),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = palette.accent
+                    )
+                } else {
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = palette.accent, modifier = Modifier.size(22.dp))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(p.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1)
+                if (p.isSaved && p.number.isNotBlank() && p.number != p.name) {
+                    Text(p.number, fontSize = 12.sp, color = palette.textSecondary, maxLines = 1)
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (held) Color(0xFFF5A524) else Color(0xFF34C759))
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    if (held) "On hold" else "Talking",
+                    fontSize = 12.sp,
+                    color = palette.textSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+        if (p.canHold || p.canSplit || p.canRemove) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (p.canHold) {
+                    ConfActionPill(
+                        icon = if (p.isOnHold) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                        label = if (p.isOnHold) "Resume" else "Hold",
+                        palette = palette,
+                        modifier = Modifier.weight(1f),
+                        active = p.isOnHold,
+                        onClick = onHold
+                    )
+                }
+                if (p.canSplit) {
+                    ConfActionPill(
+                        icon = Icons.Filled.Lock,
+                        label = "Private",
+                        palette = palette,
+                        modifier = Modifier.weight(1f),
+                        onClick = onPrivate
+                    )
+                }
+                if (p.canRemove) {
+                    ConfActionPill(
+                        icon = Icons.Filled.CallEnd,
+                        label = "End call",
+                        palette = palette,
+                        modifier = Modifier.weight(1f),
+                        danger = true,
+                        onClick = onEnd
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfActionPill(
+    icon: ImageVector,
+    label: String,
+    palette: DialerPalette,
+    modifier: Modifier = Modifier,
+    danger: Boolean = false,
+    active: Boolean = false,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(50)
+    val fill = when {
+        danger -> Color(0xFFE53E3E).copy(alpha = 0.14f)
+        active -> palette.accent
+        else -> palette.accentSoft
+    }
+    val content = when {
+        danger -> Color(0xFFE53E3E)
+        active -> Color.White
+        else -> palette.accent
+    }
+    Row(
+        modifier = modifier
+            .height(36.dp)
+            .clip(shape)
+            .background(fill)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(5.dp))
+        Text(label, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = content, maxLines = 1)
+    }
+}
+
 /** One person inside a conference call, as the call screen shows them. */
 data class ConferenceParticipantUi(
+    /** The saved contact name, or - for a number that is not saved - ONLY the number (never a carrier-supplied name). */
     val name: String,
     val number: String,
     val canRemove: Boolean,
-    val canSplit: Boolean
+    val canSplit: Boolean,
+    val isSaved: Boolean = false,
+    val isOnHold: Boolean = false,
+    /** True only when the network lets this ONE person be held on their own (otherwise use Private). */
+    val canHold: Boolean = false
 )
 
 @Composable

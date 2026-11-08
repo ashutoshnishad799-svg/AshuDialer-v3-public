@@ -71,6 +71,7 @@ import com.ashudialer.app.ui.components.Avatar
 import com.ashudialer.app.ui.theme.LocalDialerPalette
 import kotlinx.coroutines.launch
 import com.ashudialer.app.ui.components.glassCircle
+import com.ashudialer.app.ui.components.highlightMatch
 import com.ashudialer.app.ui.components.liquidGlass
 
 
@@ -346,6 +347,7 @@ fun ContactsScreen(
                                         onBlockNumber = onBlockNumber,
                                         onUnblockNumber = onUnblockNumber,
                                         isBlocked = isBlocked,
+                                        highlight = query,
                                         onLongPress = {
                                             if (selectedContactIds.isEmpty()) {
                                                 selectedContactIds = setOf(person.contactId)
@@ -519,7 +521,9 @@ private fun PersonRow(
     onUnblockNumber: (String) -> Unit,
     isBlocked: (String) -> Boolean,
     onLongPress: () -> Unit,
-    onToggleSelect: () -> Unit
+    onToggleSelect: () -> Unit,
+    // v5: what is typed in the search bar - the matching part of the name / number is coloured
+    highlight: String = ""
 ) {
     val palette = LocalDialerPalette.current
     var expanded by remember { mutableStateOf(false) }
@@ -536,7 +540,9 @@ private fun PersonRow(
             onMessage = { onMessage(primaryNumber) },
             onAvatarTap = { onOpenDetail(primaryNumber) },
             onLongPress = onLongPress,
-            onToggleSelect = onToggleSelect
+            onToggleSelect = onToggleSelect,
+            highlight = highlight,
+            phoneNumber = primaryNumber.phoneNumber
         )
     } else {
         Column {
@@ -570,13 +576,31 @@ private fun PersonRow(
                     Avatar(name = person.displayName, photoUri = person.photoUri, size = 40.dp)
                 }
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    text = person.displayName,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = palette.textPrimary,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = highlightMatch(person.displayName, highlight, palette.accent),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = palette.textPrimary,
+                        maxLines = 1
+                    )
+                    // while searching, show the number that matched
+                    val matched = if (highlight.isBlank()) null else {
+                        val digits = highlight.filter { it.isDigit() }
+                        person.numbers.firstOrNull {
+                            it.phoneNumber.contains(highlight.trim(), ignoreCase = true) ||
+                                (digits.length >= 2 && it.phoneNumber.filter { c -> c.isDigit() }.contains(digits))
+                        }
+                    }
+                    if (matched != null) {
+                        Text(
+                            text = highlightMatch(matched.phoneNumber, highlight, palette.accent),
+                            fontSize = 12.5.sp,
+                            color = palette.textSecondary,
+                            maxLines = 1
+                        )
+                    }
+                }
                 Text("${person.numbers.size} numbers", fontSize = 12.sp, color = palette.textSecondary)
                 if (person.isFavorite) {
                     Spacer(Modifier.width(8.dp))
@@ -694,7 +718,9 @@ private fun SingleNumberContactRow(
     onMessage: () -> Unit,
     onAvatarTap: () -> Unit,
     onLongPress: () -> Unit,
-    onToggleSelect: () -> Unit
+    onToggleSelect: () -> Unit,
+    highlight: String = "",
+    phoneNumber: String = ""
 ) {
     val palette = LocalDialerPalette.current
 
@@ -728,13 +754,24 @@ private fun SingleNumberContactRow(
             Avatar(name = displayName, photoUri = photoUri, size = 40.dp)
         }
         Spacer(Modifier.width(12.dp))
-        Text(
-            text = displayName,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            color = palette.textPrimary,
-            modifier = Modifier.weight(1f)
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = highlightMatch(displayName, highlight, palette.accent),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = palette.textPrimary,
+                maxLines = 1
+            )
+            // while searching, show the number too so it is clear why this contact matched
+            if (highlight.isNotBlank() && phoneNumber.isNotBlank()) {
+                Text(
+                    text = highlightMatch(phoneNumber, highlight, palette.accent),
+                    fontSize = 12.5.sp,
+                    color = palette.textSecondary,
+                    maxLines = 1
+                )
+            }
+        }
         if (isFavorite) {
             Icon(
                 Icons.Filled.Star, contentDescription = "Favorite",

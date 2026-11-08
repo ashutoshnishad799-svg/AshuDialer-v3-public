@@ -40,6 +40,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
@@ -53,18 +56,25 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -143,8 +153,8 @@ private fun looksLikePhoneNumber(text: String): Boolean {
     return formattingCharCount <= digitsOnly.length / 2
 }
 
-/** Tallest the contact-match list area ever gets (about 2.5 rows at ~64dp each). */
-private const val MAX_MATCH_ZONE_DP = 160f
+/** Tallest the contact-match list area ever gets (about 3.3 rows at ~70dp each). */
+private const val MAX_MATCH_ZONE_DP = 236f
 
 @Composable
 fun DialerScreen(
@@ -165,7 +175,12 @@ fun DialerScreen(
     onVoicemail: () -> Unit = {},
     // v2.0.1 Personalize > Dialer: "classic" | "compact" | "glass", and edge-to-edge contact suggestions
     layoutStyle: String = "classic",
-    wideSuggestions: Boolean = false,
+    wideSuggestions: Boolean = true,
+    // v5: 0..1 while the floating dialer window is opening (1 = a normal page). The suggestions, the number, every key and
+    // the call button fade and rise in one after another, which is what makes the window feel assembled, not just scaled.
+    entranceProgress: () -> Float = { 1f },
+    // v5: (dp of the top that may stay folded away, whether suggestions are showing) - used only by the floating window.
+    onWindowInfo: (Float, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val palette = LocalDialerPalette.current
@@ -268,10 +283,25 @@ fun DialerScreen(
             ?.coerceToText(context)
             ?.toString()
             .orEmpty()
-        if (clipText.isNotEmpty()) {
-            numberField = TextFieldValue(clipText, TextRange(clipText.length))
+        // Keep only what a dialer can use (digits, + * #): "Call me on +91 98765-43210." pastes as +919876543210.
+        val cleaned = clipText.filter { it.isDigit() || it == '+' || it == '*' || it == '#' }
+        if (cleaned.isNotEmpty()) insertAtCursor(cleaned)
+    }
+
+    fun copyNumber() {
+        val text = numberField.text
+        if (text.isEmpty()) return
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Phone number", text))
+        // Android 13+ shows its own "copied" confirmation; older versions get a short one from here.
+        if (android.os.Build.VERSION.SDK_INT < 33) {
+            android.widget.Toast.makeText(context, "Number copied", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
+
+    // Long press on the number: Copy / Paste / Clear. A tap on it puts the cursor there (to fix a wrong digit).
+    var numberMenuOpen by remember { mutableStateOf(false) }
+    var numberLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
 
 
     // Every number that currently matches what's been typed so far, not just
@@ -363,7 +393,7 @@ fun DialerScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         // LAYOUT, top to bottom (everything is anchored to the BOTTOM, next to the thumb, like a stock dialer):
         //
-        //   [ free space ]  [ contact suggestions ]  [ typed number ]  [ Add to Contacts / Paste ]  [ keys ]  [ call ]
+        //   [ free space ]  [ contact suggestions (+ Add to Contacts / Paste chips) ]  [ typed number ]  [ keys ]  [ call ]
         //
         // Every zone has a FIXED height that never depends on what has been typed, so nothing shifts while
         // typing. Only the keys are sized from the screen: they are 70dp (the size this dialer has always
@@ -376,19 +406,28 @@ fun DialerScreen(
         val sidePadF = (availW * 0.07f).coerceIn(16f, 32f)
         val keyFromWidth = (availW - sidePadF * 2f - 28f) / 3f
 
-        val topPadF = 8f
-        val numberZoneF = 56f          // the typed number (sits at the BOTTOM of this zone, close to the keys)
-        val hintZoneF = 42f            // "Add to Contacts" / "Paste" chips (a chip is 36dp, so it can never be clipped)
-        // One FULL suggestion row is 8dp (list padding) + 62dp (row) = 70dp. This used to be 56dp, which is why the
-        // contact name / number in the floating dialer was cut off at the bottom.
-        val minMatchF = 80f
+        val topPadF = 6f
+        val numberZoneF = 62f          // the typed number sits at the BOTTOM of this zone, right above the keys
         val haloF = 10f                // every key sits in a (key + 10dp) cell
-        val callTopGapF = 12f
-        val callBottomGapF = 22f
+        val callTopGapF = 10f
+        val callBottomGapF = 18f
 
-        // Height left for 4 key rows + the call button once the fixed zones are taken out; the call button is
-        // about 0.86 of a key, so the whole stack is (4 + 0.86) keys plus the margins.
-        val keyByHeight = (availH - topPadF - numberZoneF - hintZoneF - minMatchF - callTopGapF - callBottomGapF - 4f * haloF) / 4.86f
+        // v5: the "Add to Contacts" / "Paste" chips now live INSIDE the suggestions zone (they can never be visible at
+        // the same time as a suggestion), so the old 42dp hint row between the number and the keys is gone: the number
+        // sits lower, closer to the thumb, and that height goes to the suggestions box.
+        // One FULL suggestion row is about 70dp. Two rows (140dp) are wanted whenever the keys can stay at 50dp or more;
+        // a very short screen settles for one row rather than shrinking the keys.
+        val keyBase = availH - topPadF - numberZoneF - callTopGapF - callBottomGapF - 4f * haloF
+        val twoRowsF = 140f
+        val oneRowF = 76f
+        // The key size that exactly fills the height left after [minMatch] of suggestions. The call button follows the
+        // keys (0.86x) but never drops below 46dp: under ~53dp keys it stays pinned there and the keys take the rest.
+        fun keyFor(minMatch: Float): Float {
+            val follow = (keyBase - minMatch) / 4.86f
+            return if (follow * 0.86f >= 46f) follow else (keyBase - minMatch - 46f) / 4f
+        }
+        val minMatchF = if (keyFor(twoRowsF) >= 50f) twoRowsF else oneRowF
+        val keyByHeight = keyFor(minMatchF)
         val keyCap = when (layoutStyle) {
             "compact" -> 58f
             "glass" -> 74f
@@ -398,16 +437,24 @@ fun DialerScreen(
         val callSizeF = (keySizeF * 0.86f).coerceIn(46f, 60f)
 
         val bottomBlockF = 4f * (keySizeF + haloF) + callTopGapF + callSizeF + callBottomGapF
-        val leftoverF = availH - topPadF - numberZoneF - hintZoneF - bottomBlockF
-        val matchZoneF = leftoverF.coerceAtLeast(minMatchF).coerceAtMost(MAX_MATCH_ZONE_DP)
+        val leftoverF = availH - topPadF - numberZoneF - bottomBlockF
+        val matchZoneF = leftoverF.coerceAtLeast(oneRowF).coerceAtMost(MAX_MATCH_ZONE_DP)
         val topSpacerF = (leftoverF - matchZoneF).coerceAtLeast(0f)
-        // Only a very short screen (or landscape) cannot fit everything: then the column scrolls.
-        val needsScroll = topPadF + numberZoneF + hintZoneF + matchZoneF + bottomBlockF > availH + 1f
+        // Only a very short screen (or landscape) cannot fit everything: then, and only then, the column scrolls.
+        val needsScroll = topPadF + numberZoneF + matchZoneF + bottomBlockF > availH + 1f
+
+        // Tells the floating window how much of the top (the suggestions) can stay folded away while there is nothing
+        // to suggest: the window rests at about half the screen - just the number, keys and call button, like a stock
+        // keypad - and grows upward by itself when matches appear. The dialer's own layout never changes while that
+        // happens, so no key moves. (70dp stays visible for the handle and the Add to Contacts / Paste chips.)
+        val hasMatches = shownMatches.isNotEmpty()
+        LaunchedEffect(topPadF, topSpacerF, matchZoneF, hasMatches) {
+            onWindowInfo((topPadF + topSpacerF + matchZoneF - 70f).coerceAtLeast(0f), hasMatches)
+        }
 
         val sidePad = sidePadF.dp
         val keySize = keySizeF.dp
         val numberZoneH = numberZoneF.dp
-        val hintZoneH = hintZoneF.dp
         val matchZoneH = matchZoneF.dp
         val topPad = topPadF.dp
         val callSize = callSizeF.dp
@@ -440,19 +487,21 @@ fun DialerScreen(
         // jumpiness the fixed-height zones below were built to prevent.
         verticalArrangement = Arrangement.Top
     ) {
-        // Leftover height on tall phones: empty space ABOVE the number area, so everything below it
-        // (number, matches, keypad, call button) sits at the bottom within thumb reach. It is 0 on
-        // phones where the screen is fully used, and constant for a given screen (it never changes
+        // Leftover height on tall phones: empty space ABOVE the suggestions, so everything below it sits at the bottom
+        // within thumb reach. It is 0 when the screen is fully used, and constant for a given screen (it never changes
         // while typing), so the "dialpad jumps" fixes are unaffected.
         if (topSpacerF > 0f) Spacer(Modifier.height(topSpacerF.dp))
 
-        // Contact suggestions. Bottom-aligned, so the list sits right on top of the number and grows upward as
-        // more contacts match; the zone itself is a fixed height, so nothing below it ever moves.
-        Box(Modifier.fillMaxWidth().height(matchZoneH), contentAlignment = Alignment.BottomCenter) {
+        // Contact suggestions + the "Add to Contacts" / "Paste" chips. Bottom-aligned, so everything sits right on top of
+        // the number and grows upward; the zone itself is a fixed height, so nothing below it ever moves.
+        Box(
+            Modifier.fillMaxWidth().height(matchZoneH).staggerEntrance(entranceProgress, 0.08f),
+            contentAlignment = Alignment.BottomCenter
+        ) {
             androidx.compose.animation.AnimatedVisibility(
                 visible = shownMatches.isNotEmpty(),
-                enter = fadeIn(animationSpec = tween(140)) + slideInVertically(animationSpec = tween(170, easing = FastOutSlowInEasing)) { it / 6 },
-                exit = fadeOut(animationSpec = tween(110)),
+                enter = fadeIn(animationSpec = tween(160)) + slideInVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 8 },
+                exit = fadeOut(animationSpec = tween(120)),
                 modifier = Modifier.fillMaxWidth().heightIn(max = matchZoneH)
             ) {
                 MatchedContactsList(
@@ -466,46 +515,15 @@ fun DialerScreen(
                     onAvatarClick = { contact -> vibrate(); onAvatarClick(contact) }
                 )
             }
-        }
-
-        // The typed number: fixed height, centred, directly above the chips row and the keys.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(numberZoneH)
-                .then(if (layoutStyle == "glass") Modifier.glassCard(palette, 18.dp) else Modifier)
-                .padding(bottom = 2.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            BasicTextField(
-                value = numberField,
-                onValueChange = { numberField = it },
-                readOnly = true,
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = numberFont.sp,
-                    fontWeight = FontWeight.Light,
-                    color = palette.textPrimary,
-                    textAlign = TextAlign.Center
-                ),
-                singleLine = true,
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(palette.accent),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        // "Add to Contacts" / "Paste". ONE row, ONE copy of each chip. There used to be a second "Add to Contacts"
-        // chip inside the number zone as well; both sat in boxes shorter than the chip, so each was cut off (the
-        // hidden "Add to Contacts" and the empty pill under the number). The row is a fixed 48dp tall and the chips
-        // are 36dp, so they always fit; if both apply they sit side by side instead of on top of each other.
-        Box(
-            modifier = Modifier.fillMaxWidth().height(hintZoneH),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = showAddContactHint,
-                    enter = fadeIn(animationSpec = tween(140)) + scaleIn(animationSpec = tween(160), initialScale = 0.9f),
-                    exit = fadeOut(animationSpec = tween(100)) + scaleOut(animationSpec = tween(100), targetScale = 0.9f)
+                    visible = showAddContactHint && shownMatches.isEmpty(),
+                    enter = fadeIn(animationSpec = tween(160)) + scaleIn(animationSpec = tween(180), initialScale = 0.92f),
+                    exit = fadeOut(animationSpec = tween(100)) + scaleOut(animationSpec = tween(100), targetScale = 0.92f)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -522,20 +540,109 @@ fun DialerScreen(
                     }
                 }
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = clipboardHasNumber,
-                    enter = fadeIn(animationSpec = tween(140)) + scaleIn(animationSpec = tween(160), initialScale = 0.9f),
-                    exit = fadeOut(animationSpec = tween(100)) + scaleOut(animationSpec = tween(100), targetScale = 0.9f)
+                    visible = clipboardHasNumber && shownMatches.isEmpty(),
+                    enter = fadeIn(animationSpec = tween(160)) + scaleIn(animationSpec = tween(180), initialScale = 0.92f),
+                    exit = fadeOut(animationSpec = tween(100)) + scaleOut(animationSpec = tween(100), targetScale = 0.92f)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .height(36.dp)
                             .clip(RoundedCornerShape(18.dp))
-                            .border(1.dp, palette.cardBorder, RoundedCornerShape(18.dp))
+                            .background(palette.accentSoft)
                             .clickable { pasteFromClipboard() }
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = 14.dp)
                     ) {
-                        Text(text = "Paste", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1)
+                        Icon(Icons.Filled.ContentPaste, contentDescription = null, tint = palette.accent, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(text = "Paste", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.accent, maxLines = 1)
+                    }
+                }
+            }
+        }
+
+        // The typed number: fixed height, centred, directly above the keys. A tap puts the cursor there (to fix a wrong
+        // digit in the middle); a long press opens Copy / Paste / Clear. The cursor only shows while it is NOT at the end.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(numberZoneH)
+                .staggerEntrance(entranceProgress, 0.12f)
+                .then(if (layoutStyle == "glass") Modifier.glassCard(palette, 18.dp) else Modifier)
+                .padding(bottom = 2.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { numberMenuOpen = true },
+                            onTap = { pos ->
+                                val layout = numberLayout
+                                val text = numberField.text
+                                if (layout != null && text.isNotEmpty()) {
+                                    val index = layout
+                                        .getOffsetForPosition(Offset(pos.x, layout.size.height / 2f))
+                                        .coerceIn(0, text.length)
+                                    numberField = numberField.copy(selection = TextRange(index))
+                                }
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = number,
+                    fontSize = numberFont.sp,
+                    fontWeight = FontWeight.Light,
+                    color = palette.textPrimary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Clip,
+                    onTextLayout = { numberLayout = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .drawWithContent {
+                            drawContent()
+                            val layout = numberLayout
+                            val cursor = numberField.selection.start
+                            if (layout != null && cursor in 0 until numberField.text.length) {
+                                val rect = layout.getCursorRect(cursor)
+                                drawLine(
+                                    color = palette.accent,
+                                    start = Offset(rect.left, rect.top),
+                                    end = Offset(rect.left, rect.bottom),
+                                    strokeWidth = 2.dp.toPx()
+                                )
+                            }
+                        }
+                )
+                DropdownMenu(
+                    expanded = numberMenuOpen,
+                    onDismissRequest = { numberMenuOpen = false }
+                ) {
+                    if (number.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("Copy") },
+                            leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                            onClick = { copyNumber(); numberMenuOpen = false }
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Paste") },
+                        leadingIcon = { Icon(Icons.Filled.ContentPaste, contentDescription = null) },
+                        onClick = { pasteFromClipboard(); numberMenuOpen = false }
+                    )
+                    if (number.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("Clear") },
+                            leadingIcon = { Icon(Icons.Filled.Clear, contentDescription = null) },
+                            onClick = { numberField = TextFieldValue(""); numberMenuOpen = false }
+                        )
                     }
                 }
             }
@@ -544,17 +651,19 @@ fun DialerScreen(
         val keyVerticalPadding = 0.dp
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            keys.chunked(3).forEach { row ->
+            keys.chunked(3).forEachIndexed { rowIndex, row ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 0.dp, vertical = keyVerticalPadding)
                 ) {
-                    row.forEach { key ->
+                    row.forEachIndexed { colIndex, key ->
                         DialerKey(
                             key = key,
                             palette = palette,
                             size = keySize,
+                            entrance = entranceProgress,
+                            entranceDelay = 0.16f + (rowIndex * 3 + colIndex) * 0.025f,
                             // Each key owns an equal third of the row, so there is no dead gap between two keys: a touch
                             // that lands a little to one side of a key still presses THAT key, which is what makes fast
                             // typing forgiving.
@@ -577,7 +686,10 @@ fun DialerScreen(
         }
 
         Box(
-            modifier = Modifier.fillMaxWidth().padding(top = callTopGap, bottom = callBottomGap),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = callTopGap, bottom = callBottomGap)
+                .staggerEntrance(entranceProgress, 0.46f, rise = 10.dp),
             contentAlignment = Alignment.Center
         ) {
             val callInteractionSource = remember { MutableInteractionSource() }
@@ -701,36 +813,32 @@ private fun MatchedContactsList(
             .distinctBy { it.contactId + "|" + it.phoneNumber }
     }
 
-    // Width now fills the available space (the parent Column already caps
-    // total width via its own 28dp horizontal padding) instead of a fixed
-    // 340dp - on wider phones the list previously sat narrower than the
-    // dialpad above it, looking cramped rather than "open." Height cap
-    // raised from 216dp to 340dp so noticeably more rows are visible before
-    // the list needs to scroll, matching the more spacious feel of the
-    // reference screenshot rather than a small tucked-away card.
+    // v5: ONE soft panel for all the matches - no separate boxes, no divider lines, no border. With "wide" on it runs edge
+    // to edge, and its top edge dissolves into the page, so the list reads as part of the screen rather than a card on it.
+    val panel = when {
+        palette.glass && palette.isDark -> palette.cardBackground.copy(alpha = 0.45f)
+        palette.glass -> palette.cardBackground.copy(alpha = 0.60f)
+        else -> palette.cardBackground.copy(alpha = 0.92f)
+    }
     LazyColumn(
         modifier = Modifier
-            .padding(top = 8.dp)
-            // wide: the box runs edge to edge (it bleeds out into the dial pad's side margins) and is taller
             .then(if (wide) Modifier.bleedHorizontally(bleed) else Modifier)
             .fillMaxWidth()
-            .heightIn(max = if (wide) 420.dp else 340.dp)
-            .glassCard(palette, if (wide) 26.dp else 20.dp),
+            .heightIn(max = 340.dp)
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 20.dp, bottomEnd = 20.dp))
+            .background(panel)
+            .verticalEdgeFade(top = 16.dp),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 4.dp)
     ) {
         items(rows, key = { it.contactId + "|" + it.phoneNumber }) { contact ->
-            Box(Modifier.padding(vertical = if (wide) 6.dp else 0.dp)) {
-                MatchedContactRow(
-                    contact = contact,
-                    typedDigits = typedDigits,
-                    palette = palette,
-                    onCall = { onCall(contact.phoneNumber) },
-                    onMessage = { onMessage(contact.phoneNumber) },
-                    onAvatarClick = { onAvatarClick(contact) }
-                )
-            }
-            if (contact != rows.last()) {
-                HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
-            }
+            MatchedContactRow(
+                contact = contact,
+                typedDigits = typedDigits,
+                palette = palette,
+                onCall = { onCall(contact.phoneNumber) },
+                onMessage = { onMessage(contact.phoneNumber) },
+                onAvatarClick = { onAvatarClick(contact) }
+            )
         }
     }
 }
@@ -756,7 +864,7 @@ private fun MatchedContactRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onCall)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Avatar gets its own tap target (opens the contact/number detail
@@ -903,6 +1011,8 @@ private fun DialerKey(
     palette: com.ashudialer.app.ui.theme.DialerPalette,
     size: androidx.compose.ui.unit.Dp = 78.dp,
     modifier: Modifier = Modifier,
+    entrance: () -> Float = { 1f },
+    entranceDelay: Float = 0f,
     onLongPress: (() -> Unit)? = null,
     onPress: () -> Unit
 ) {
@@ -928,6 +1038,7 @@ private fun DialerKey(
     Box(
         modifier = modifier
             .height(size + 10.dp)
+            .staggerEntrance(entrance, entranceDelay, rise = 14.dp, scaleFrom = 0.82f)
             .pointerInput(key) {
                 detectTapGestures(
                     onLongPress = { onLongPress?.invoke() },
@@ -975,6 +1086,47 @@ private fun DialerKey(
         }
     }
 }
+
+/**
+ * Fades an element in: transparent -> opaque and a small rise (and, optionally, a grow) as [entrance] runs from [delay]
+ * to [delay] + 0.5. Read in the draw phase only, so it costs no recomposition. Does nothing once [entrance] reaches 1.
+ */
+private fun Modifier.staggerEntrance(
+    entrance: () -> Float,
+    delay: Float,
+    rise: androidx.compose.ui.unit.Dp = 12.dp,
+    scaleFrom: Float = 1f
+): Modifier = this.graphicsLayer {
+    val e = entrance()
+    if (e < 1f) {
+        val k = FastOutSlowInEasing.transform(((e - delay) / 0.5f).coerceIn(0f, 1f))
+        alpha = k
+        translationY = (1f - k) * rise.toPx()
+        val s = scaleFrom + (1f - scaleFrom) * k
+        scaleX = s
+        scaleY = s
+    }
+}
+
+/** Soft-fades the top edge of a scrolling panel into whatever is behind it (no hard line, no border). */
+private fun Modifier.verticalEdgeFade(top: androidx.compose.ui.unit.Dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fadeHeight = top.toPx().coerceAtMost(size.height / 2f)
+        if (fadeHeight > 0f) {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black),
+                    startY = 0f,
+                    endY = fadeHeight
+                ),
+                topLeft = Offset.Zero,
+                size = Size(size.width, fadeHeight),
+                blendMode = BlendMode.DstIn
+            )
+        }
+    }
 
 /** Lets a child be wider than its parent by [bleed] on each side (used for the edge-to-edge suggestion box). */
 private fun Modifier.bleedHorizontally(bleed: androidx.compose.ui.unit.Dp): Modifier = this.layout { measurable, constraints ->

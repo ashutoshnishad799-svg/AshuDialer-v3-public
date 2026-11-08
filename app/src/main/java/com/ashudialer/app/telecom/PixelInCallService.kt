@@ -88,6 +88,25 @@ class PixelInCallService : InCallService() {
         private val _isMuted = kotlinx.coroutines.flow.MutableStateFlow(false)
         val isMutedFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _isMuted
 
+        // v5 conference: "Merge" used to do nothing at all when Telecom was not ready to offer it at the exact
+        // moment of the tap. Now the request is remembered and retried every 100 ms until Telecom accepts it (or
+        // 6 s pass), and the screen shows "Merging..." from the first tap instead of staying silent.
+        private val _mergePending = kotlinx.coroutines.flow.MutableStateFlow(false)
+        val mergePendingFlow: kotlinx.coroutines.flow.StateFlow<Boolean> = _mergePending
+
+        private const val MERGE_TICK_MS = 100L
+        private const val MERGE_OFFER_TIMEOUT_MS = 6000L
+        private const val MERGE_FORM_TIMEOUT_MS = 3500L
+        private const val AUTO_MERGE_WINDOW_MS = 120_000L
+
+        @Volatile
+        private var autoMergeArmedAt = 0L
+
+        /** Call when the person taps "Add call": the next call they place and that answers is merged for them. */
+        fun armAutoMerge() {
+            autoMergeArmedAt = System.currentTimeMillis()
+        }
+
         /**
          * True once this call has genuinely become a bidirectional native
          * (carrier ViLTE/VoLTE) video call - i.e. Telecom's own
@@ -308,6 +327,7 @@ class PixelInCallService : InCallService() {
 
             if (state == Call.STATE_ACTIVE) {
                 callKey(call)?.let { loggedAsAnswered.add(it) }
+                maybeAutoMerge(call)
             }
 
             if (state == Call.STATE_DISCONNECTED) {
@@ -325,6 +345,7 @@ class PixelInCallService : InCallService() {
 
         override fun onChildrenChanged(call: Call, children: List<Call>) {
             super.onChildrenChanged(call, children)
+            if (children.isNotEmpty() && _mergePending.value) stopMerging()
             notifyListeners()
             refreshNotificationFromCalls()
         }
@@ -539,6 +560,13 @@ class PixelInCallService : InCallService() {
         return "Conference call (${members.size.coerceAtLeast(2)})"
     }
 
+    /** How many people are in a merged call (0 for a normal call). Shown in the notification. */
+    private fun conferenceCount(call: Call): Int {
+        val members = conferenceMembers(call)
+        val isConference = members.isNotEmpty() || call.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
+        return if (isConference) members.size.coerceAtLeast(2) else 0
+    }
+
     private fun handleStateForNotification(call: Call, state: Int) {
         // v2.0.1: a conference member is never shown on its own, and only the call that is in front owns the
         // notification - a held call changing state must not rename it (that was the "wrong name" bug).
@@ -550,6 +578,7 @@ class PixelInCallService : InCallService() {
         val number = call.details?.handle?.schemeSpecificPart ?: "Unknown"
         val carrierName = call.details?.callerDisplayName?.takeIf { it.isNotBlank() }
         val name = conferenceTitle(call) ?: nameForCall(number, carrierName)
+        val confCount = conferenceCount(call)
         val isIncoming = call.details?.callDirection == Call.Details.DIRECTION_INCOMING
 
         startContactLookup(call, number)
@@ -568,7 +597,8 @@ class PixelInCallService : InCallService() {
                 CallNotificationHelper.showOngoingCallNotification(
                     applicationContext, name,
                     connected = true,
-                    connectTimeMillis = call.details?.connectTimeMillis ?: 0L
+                    connectTimeMillis = call.details?.connectTimeMillis ?: 0L,
+                    conferenceCount = confCount
                 )
             }
             Call.STATE_HOLDING -> {
@@ -576,7 +606,8 @@ class PixelInCallService : InCallService() {
                     applicationContext, name,
                     connected = true,
                     connectTimeMillis = call.details?.connectTimeMillis ?: 0L,
-                    onHold = true
+                    onHold = true,
+                    conferenceCount = confCount
                 )
             }
             Call.STATE_DISCONNECTED -> {
@@ -876,22 +907,101 @@ class PixelInCallService : InCallService() {
     }
 
 
-    fun mergeCalls() {
-        val primary = currentCall ?: return
-        val secondary = secondaryCall ?: return
-        try {
+    // ---- v5 conference: fast merge -------------------------------------------------------------------------
+
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var mergeIssued = false
+    private var mergeWaitedMs = 0L
+
+    private val mergeTick = object : Runnable {
+        override fun run() {
+            if (!_mergePending.value) return
+            mergeWaitedMs += MERGE_TICK_MS
+            if (!mergeIssued) {
+                if (tryMergeNow()) {
+                    mergeIssued = true
+                    mergeWaitedMs = 0L
+                } else if (mergeWaitedMs >= MERGE_OFFER_TIMEOUT_MS || !hasMultipleCalls) {
+                    stopMerging()
+                    return
+                }
+            } else {
+                val formed = topCalls.any { conferenceMembers(it).isNotEmpty() }
+                if (formed || mergeWaitedMs >= MERGE_FORM_TIMEOUT_MS) {
+                    stopMerging()
+                    return
+                }
+            }
+            mainHandler.postDelayed(this, MERGE_TICK_MS)
+        }
+    }
+
+    private fun stopMerging() {
+        mainHandler.removeCallbacks(mergeTick)
+        mergeIssued = false
+        mergeWaitedMs = 0L
+        _mergePending.value = false
+        notifyListeners()
+    }
+
+    /** Asks Telecom to join the two calls right now. True when a request was actually sent. */
+    private fun tryMergeNow(): Boolean {
+        val primary = currentCall ?: return false
+        val secondary = secondaryCall ?: return false
+        return try {
             when {
-                primary.conferenceableCalls.contains(secondary) -> primary.conference(secondary)
-                secondary.conferenceableCalls.contains(primary) -> secondary.conference(primary)
-                primary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) -> primary.mergeConference()
-                secondary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) -> secondary.mergeConference()
-                else -> Log.w(TAG, "Merge requested but Telecom does not offer it for this pair yet")
+                primary.conferenceableCalls.contains(secondary) -> { primary.conference(secondary); true }
+                secondary.conferenceableCalls.contains(primary) -> { secondary.conference(primary); true }
+                primary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) -> { primary.mergeConference(); true }
+                secondary.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) -> { secondary.mergeConference(); true }
+                else -> false
             }
         } catch (e: Throwable) {
             // Some carrier/OEM phone accounts advertise two calls but reject conference() for a moment.
-            // Catching keeps the in-call screen alive; the callbacks above re-enable the button the moment
-            // Telecom says the pair is conferenceable.
+            // The retry loop above simply tries again on the next tick.
             Log.w(TAG, "Conference request rejected by Telecom", e)
+            false
+        }
+    }
+
+    /** "Add call" was tapped and the new call just answered: join it without making the person tap Merge. */
+    private fun maybeAutoMerge(call: Call) {
+        val armedAt = autoMergeArmedAt
+        if (armedAt == 0L || !latestSettings.autoMergeCalls) return
+        if (System.currentTimeMillis() - armedAt > AUTO_MERGE_WINDOW_MS) {
+            autoMergeArmedAt = 0L
+            return
+        }
+        if (call.parent != null || !hasMultipleCalls) return
+        if (call.details?.callDirection == Call.Details.DIRECTION_INCOMING) return
+        autoMergeArmedAt = 0L
+        mergeCalls()
+    }
+
+    /** Joins the two calls. Taps while a merge is already running are ignored; the screen shows "Merging...". */
+    fun mergeCalls() {
+        if (_mergePending.value) return
+        _mergePending.value = true
+        mergeIssued = false
+        mergeWaitedMs = 0L
+        mainHandler.removeCallbacks(mergeTick)
+        // First attempt immediately (no waiting for the first tick); the ticks retry and then watch for the
+        // conference to actually form.
+        if (tryMergeNow()) mergeIssued = true
+        mainHandler.postDelayed(mergeTick, MERGE_TICK_MS)
+        notifyListeners()
+    }
+
+    /** Conference: hold or resume ONE person, where the network allows it (the screen only offers it then). */
+    fun toggleHoldParticipant(member: Call) {
+        try {
+            when (member.state) {
+                Call.STATE_HOLDING -> member.unhold()
+                Call.STATE_ACTIVE -> member.hold()
+                else -> Unit
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not change a participant's hold state", e)
         }
     }
 

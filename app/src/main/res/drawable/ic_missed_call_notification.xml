@@ -5,11 +5,16 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="#FFFFFF">
-    <!-- Missed-call glyph: handset plus a clear downward return arrow. -->
+    <!--
+        Missed-call glyph (v5). The old one was a normal handset with a small up-right arrow, which at status-bar
+        size looked exactly like the "call in progress" icon (and the arrow pointed the outgoing way). This is the
+        classic "phone missed" shape instead: a hung-up handset along the bottom and a bold arrow bracket on top,
+        so it can never be mistaken for an active call.
+    -->
     <path
         android:fillColor="#FF000000"
-        android:pathData="M6.62,10.79c1.44,2.83 3.76,5.15 6.59,6.59l2.2,-2.2c0.28,-0.28 0.67,-0.36 1.02,-0.25 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1v3.5c0,0.55 -0.45,1 -1,1C10.61,21 3,13.39 3,4c0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02L6.62,10.79z" />
+        android:pathData="M6.5,5.5L12,11l7,-7 -1,-1 -6,6 -4.5,-4.5H11V3H5v6h1.5z" />
     <path
         android:fillColor="#FF000000"
-        android:pathData="M18.8,5.2v5.6h-1.7V8.1l-2.55,2.55 -1.2,-1.2L15.9,6.9h-2.7V5.2z" />
+        android:pathData="M23.71,16.67C20.66,13.78 16.54,12 12,12 7.46,12 3.34,13.78 0.29,16.67c-0.18,0.18 -0.29,0.43 -0.29,0.71 0,0.28 0.11,0.53 0.29,0.71l2.48,2.48c0.18,0.18 0.43,0.29 0.71,0.29 0.27,0 0.52,-0.11 0.7,-0.28 0.79,-0.74 1.69,-1.36 2.66,-1.85 0.33,-0.16 0.56,-0.5 0.56,-0.9v-3.1c1.45,-0.48 3,-0.73 4.6,-0.73s3.15,0.25 4.6,0.72v3.1c0,0.39 0.23,0.74 0.56,0.9 0.98,0.49 1.87,1.12 2.66,1.85 0.18,0.18 0.43,0.28 0.7,0.28 0.28,0 0.53,-0.11 0.71,-0.29l2.48,-2.48c0.18,-0.18 0.29,-0.43 0.29,-0.71 0,-0.27 -0.11,-0.52 -0.29,-0.7z" />
 </vector>

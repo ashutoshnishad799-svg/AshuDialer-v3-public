@@ -82,11 +82,12 @@ import com.ashudialer.app.ui.components.Avatar
 import com.ashudialer.app.ui.components.DialerTab
 import com.ashudialer.app.ui.components.NavOrderEditor
 import com.ashudialer.app.ui.components.bounceClick
+import com.ashudialer.app.ui.components.glassListCard
 import com.ashudialer.app.ui.components.liquidGlass
 import com.ashudialer.app.ui.components.parseNavOrder
 import com.ashudialer.app.ui.components.serializeNavOrder
 import com.ashudialer.app.ui.theme.AUTO_THEME_ID
-import com.ashudialer.app.ui.theme.AllPalettes
+import com.ashudialer.app.ui.theme.visiblePalettes
 import com.ashudialer.app.ui.theme.AshuStyle
 import com.ashudialer.app.ui.theme.DefaultPalettes
 import com.ashudialer.app.ui.theme.DialerPalette
@@ -141,7 +142,11 @@ private data class Live(
     val vibrate: Boolean? = null,
     val callNotif: String? = null,
     val callLook: String? = null,
-    val navAutoSave: Boolean? = null
+    val navAutoSave: Boolean? = null,
+    val moreThemes: Boolean? = null,
+    val floatMorph: Boolean? = null,
+    val autoMerge: Boolean? = null,
+    val dialerSpeed: String? = null
 )
 
 /** Mixes a hue (0..1) with a "shade" (0 = deep, 0.5 = pure, 1 = pastel) into one colour. */
@@ -213,6 +218,10 @@ fun PersonalizeScreen(
     val callNotif = live.callNotif ?: settings.callNotifStyle
     val callLook = live.callLook ?: settings.callNotifLook
     val navAutoSave = live.navAutoSave ?: settings.navAutoSave
+    val moreThemes = live.moreThemes ?: settings.moreThemes
+    val floatMorph = live.floatMorph ?: settings.floatMorph
+    val dialerSpeed = live.dialerSpeed ?: settings.dialerAnimSpeed
+    val autoMerge = live.autoMerge ?: settings.autoMergeCalls
 
     val style = remember(baseStyle, glassPct, cornerPct, motionPct, hapticLv, avatar, density, navStyle, navLabels, keypad, specular, aurora, swipe, stagger) {
         baseStyle.copy(
@@ -306,7 +315,7 @@ fun PersonalizeScreen(
                             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            AllPalettes.filter { p -> DefaultPalettes.none { it.id == p.id } }.forEach { p ->
+                            visiblePalettes(moreThemes, selectedTheme).filter { p -> DefaultPalettes.none { it.id == p.id } }.forEach { p ->
                                 ThemeTile(
                                     name = p.displayName,
                                     selected = selectedTheme == p.id,
@@ -317,6 +326,12 @@ fun PersonalizeScreen(
                                 ) { live = live.copy(theme = p.id); onThemeSelected(p.id) }
                             }
                         }
+                        Spacer(Modifier.height(6.dp))
+                        PrefSwitchRow(
+                            "Show more colour themes",
+                            "Emerald Night, Obsidian Gold, Midnight, Violet, Sunset and Rainbow. Off keeps the list clean.",
+                            moreThemes, palette
+                        ) { live = live.copy(moreThemes = it); onBool(PKey.MORE_THEMES, it) }
                     }
                 }
 
@@ -460,7 +475,7 @@ fun PersonalizeScreen(
                         Text("Animation speed", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                         Spacer(Modifier.height(6.dp))
                         Segmented(
-                            listOf("0" to "Off", "60" to "Calm", "100" to "Normal", "160" to "Lively"),
+                            listOf("0" to "Off", "60" to "Smooth", "100" to "Standard", "160" to "Fast"),
                             listOf(0, 60, 100, 160).minByOrNull { kotlin.math.abs(it - motionPct) }.toString(),
                             palette
                         ) { live = live.copy(motion = it.toInt()); onInt(PKey.MOTION, it.toInt()) }
@@ -535,9 +550,26 @@ fun PersonalizeScreen(
                         ) { live = live.copy(fab = it); onBool(PKey.QUICK_FAB, it) }
                         PrefSwitchRow(
                             "Open dialer as a floating window",
-                            "A glass dialer pops over an empty backdrop instead of switching pages",
+                            "A solid dialer card pops over the page instead of switching pages",
                             dialerFloating, palette
                         ) { live = live.copy(dialerFloating = it); onBool(PKey.DIALER_FLOATING, it) }
+                        PrefSwitchRow(
+                            "Spring-open animation",
+                            "The floating dialer grows out of its button with a spring, key by key. Off = a quick fade",
+                            floatMorph, palette
+                        ) { live = live.copy(floatMorph = it); onBool(PKey.FLOAT_MORPH, it) }
+                        Spacer(Modifier.height(6.dp))
+                        Text("Dialer animation speed", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                        Text(
+                            "How quickly the floating dialer opens, closes and builds its keys.",
+                            fontSize = 12.sp,
+                            color = palette.textSecondary
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Segmented(listOf("fast" to "Fast", "standard" to "Standard", "smooth" to "Smooth"), dialerSpeed, palette) {
+                            live = live.copy(dialerSpeed = it); onString(PKey.DIALER_SPEED, it)
+                        }
+                        Spacer(Modifier.height(10.dp))
                         PrefSwitchRow(
                             "Wide contact suggestions",
                             "The matches under the number use the full width and are bigger",
@@ -576,6 +608,12 @@ fun PersonalizeScreen(
                             }
                             Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = palette.textSecondary)
                         }
+                        Spacer(Modifier.height(4.dp))
+                        PrefSwitchRow(
+                            "Auto-merge added calls",
+                            "Tap Add call, and once the new person answers they join the conference by themselves",
+                            autoMerge, palette
+                        ) { live = live.copy(autoMerge = it); onBool(PKey.AUTO_MERGE, it) }
                         Spacer(Modifier.height(10.dp))
                         Text("Call notification", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
                         Text(
@@ -814,7 +852,7 @@ private fun PCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .liquidGlass(palette, RoundedCornerShape(22.dp))
+            .glassListCard(palette, 22.dp)
             .padding(16.dp)
     ) {
         Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)

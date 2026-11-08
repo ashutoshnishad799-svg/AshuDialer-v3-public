@@ -54,6 +54,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,6 +71,7 @@ import com.ashudialer.app.ui.theme.LocalDialerPalette
 import java.text.SimpleDateFormat
 import java.util.*
 import com.ashudialer.app.ui.components.glassCircle
+import com.ashudialer.app.ui.components.highlightMatch
 import com.ashudialer.app.ui.components.liquidGlass
 
 private val recentFilters = listOf("All", "Missed", "Incoming", "Outgoing", "Today", "Contacts", "Identified", "Spam")
@@ -373,8 +375,8 @@ fun RecentsScreen(
                             Avatar(name = contact.displayName, photoUri = contact.photoUri, size = 42.dp)
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(contact.displayName, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1)
-                                Text(contact.phoneNumber, fontSize = 12.sp, color = palette.textSecondary, maxLines = 1)
+                                Text(highlightMatch(contact.displayName, query, palette.accent), fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1)
+                                Text(highlightMatch(contact.phoneNumber, query, palette.accent), fontSize = 12.sp, color = palette.textSecondary, maxLines = 1)
                                 Text("No recent call found", fontSize = 10.sp, color = palette.textSecondary)
                             }
                             IconButton(onClick = { onCallSearchContact(contact) }) {
@@ -457,7 +459,8 @@ fun RecentsScreen(
                                     },
                                     showContactThumbnails = showContactThumbnails,
                                     showPhoneNumbers = showPhoneNumbers,
-                                    useRelativeDate = useRelativeDate
+                                    useRelativeDate = useRelativeDate,
+                                    highlightQuery = query
                                 )
                                 if (!isLast) {
                                     HorizontalDivider(
@@ -792,7 +795,10 @@ private fun RecentRow(
     onLongPress: () -> Unit = {},
     showContactThumbnails: Boolean = true,
     showPhoneNumbers: Boolean = false,
-    useRelativeDate: Boolean = true
+    useRelativeDate: Boolean = true,
+    // v5: what is typed in the search bar. The matching part of the name and number is coloured, and while searching the
+    // number is always shown (even with "show numbers" off) so it is clear WHY a call matched.
+    highlightQuery: String = ""
 ) {
     val palette = LocalDialerPalette.current
     val isMissed = call.direction == CallDirection.MISSED
@@ -838,9 +844,12 @@ private fun RecentRow(
         }
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val titleText = if (showPhoneNumbers && canReachNumber && call.phoneNumber != call.displayName)
+                    "${call.displayName} · ${call.phoneNumber}" else call.displayName
                 Text(
-                    text = if (showPhoneNumbers && canReachNumber && call.phoneNumber != call.displayName)
-                        "${call.displayName} · ${call.phoneNumber}" else call.displayName,
+                    text = remember(titleText, highlightQuery, palette.accent) {
+                        highlightMatch(titleText, highlightQuery, palette.accent)
+                    },
                     fontSize = 16.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (isMissed) palette.danger else palette.textPrimary,
@@ -863,9 +872,20 @@ private fun RecentRow(
                     DirectionIcon(direction = call.direction)
                 }
                 Spacer(Modifier.width(5.dp))
+                val whenText = if (useRelativeDate) formatRelativeShort(call.timestampMillis) else formatTime(call.timestampMillis)
+                val searching = highlightQuery.isNotBlank() && canReachNumber && call.phoneNumber != call.displayName
                 Text(
-                    text = (if (canReachNumber) "Mobile • " else "") +
-                        (if (useRelativeDate) formatRelativeShort(call.timestampMillis) else formatTime(call.timestampMillis)),
+                    text = remember(searching, canReachNumber, call.phoneNumber, highlightQuery, whenText, palette.accent) {
+                        buildAnnotatedString {
+                            if (searching) {
+                                append(highlightMatch(call.phoneNumber, highlightQuery, palette.accent))
+                                append("  •  ")
+                            } else if (canReachNumber) {
+                                append("Mobile • ")
+                            }
+                            append(whenText)
+                        }
+                    },
                     fontSize = 13.5.sp,
                     color = if (isMissed) palette.danger.copy(alpha = 0.85f) else palette.textSecondary
                 )

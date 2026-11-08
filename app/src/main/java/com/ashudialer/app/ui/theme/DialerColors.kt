@@ -583,13 +583,31 @@ val EmeraldNightPalette = DialerPalette(
  */
 val DefaultPalettes = listOf(WhitePalette, DarkModePalette)
 
-/** Everything the person can choose. Defaults first, then the optional looks. */
-val AllPalettes = listOf(
+/**
+ * v5: the themes that are always offered - the plain ones plus the two glass looks and Slate (Professional).
+ */
+val MainPalettes = listOf(
     WhitePalette, DarkModePalette,
     PureBlackPalette, ProfessionalPalette,
     LiquidGlassPalette, FrostGlassPalette,
-    ObsidianPalette, EmeraldNightPalette,
-    GradientPalette, OceanPalette, SunsetPalette, RoseGoldPalette, MidnightPalette, VioletPalette, RainbowPalette
+    GradientPalette, OceanPalette, RoseGoldPalette
 )
+
+/**
+ * v5: the loud, colourful looks that read as "cartoony". They are hidden until Personalize > Theme >
+ * "Show more colour themes" is switched on - and are still shown, whatever that switch says, while one of them is the
+ * theme currently in use (so nobody ever loses sight of their own theme).
+ */
+val ExtraPalettes = listOf(
+    ObsidianPalette, EmeraldNightPalette,
+    SunsetPalette, MidnightPalette, VioletPalette, RainbowPalette
+)
+
+/** Everything that exists (saved theme ids keep working even when their tile is hidden). */
+val AllPalettes = MainPalettes + ExtraPalettes
+
+/** The themes to list right now: the main ones, plus the extras when asked for or already in use. */
+fun visiblePalettes(showMore: Boolean, currentId: String): List<DialerPalette> =
+    if (showMore || ExtraPalettes.any { it.id == currentId }) AllPalettes else MainPalettes
 
 fun paletteById(id: String): DialerPalette = AllPalettes.find { it.id == id } ?: GradientPalette

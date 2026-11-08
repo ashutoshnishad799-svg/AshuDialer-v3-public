@@ -50,7 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.ashudialer.app.data.AppSettings
 import com.ashudialer.app.ui.theme.DialerPalette
 import com.ashudialer.app.ui.theme.LocalDialerPalette
-import com.ashudialer.app.ui.components.glassCard
+import com.ashudialer.app.ui.components.glassListCard
 
 
 @Composable
@@ -419,7 +419,7 @@ internal fun SectionLabel(text: String, palette: DialerPalette) {
 @Composable
 internal fun SettingsCard(palette: DialerPalette, content: @Composable () -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth().glassCard(palette, 16.dp)
+        modifier = Modifier.fillMaxWidth().glassListCard(palette, 16.dp)
     ) {
         content()
     }

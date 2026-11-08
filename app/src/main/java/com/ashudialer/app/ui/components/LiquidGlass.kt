@@ -178,7 +178,9 @@ private class GlassLook(
                     rim = SolidColor(edge.copy(alpha = (edge.alpha * borderAlpha).coerceIn(0f, 1f))),
                     rimDp = 1f,
                     hairline = null,
-                    topLight = if (specular) Color.White.copy(alpha = if (dark) 0.14f else 0.95f) else null
+                    // v5: no thin light line under the top edge any more. On Frost Glass it showed as a faint
+                    // stray line across the top of every pane (most visible on the dialer's number list).
+                    topLight = null
                 )
             }
 
@@ -271,6 +273,36 @@ fun Modifier.glassCard(
     corner: Dp = 18.dp,
     tintAlpha: Float = 0.55f
 ): Modifier = this.liquidGlass(palette, RoundedCornerShape(corner), tintAlpha)
+
+/**
+ * v5: the same glass card, made cheap for LONG scrolling screens (Settings, Personalize).
+ *
+ * liquidGlass() paints every pane with a clip, a path, a gradient fill and a stroke. That is fine for a handful of
+ * cards, but Settings is the longest list in the app and on Frost / Liquid Glass it made scrolling stutter on
+ * mid-range phones. This version is ONE translucent fill plus a hairline edge drawn as plain rounded rectangles -
+ * visually the same pane (same intensity slider), a fraction of the GPU work. Non-glass themes are unchanged.
+ */
+@Composable
+fun Modifier.glassListCard(
+    palette: DialerPalette,
+    corner: Dp = 16.dp
+): Modifier {
+    if (!palette.glass) return this.glassCard(palette, corner)
+    val style = LocalAshuStyle.current
+    val shp = rememberScaledShape(RoundedCornerShape(corner), style.cornerScale)
+    val k = style.glassIntensity.coerceIn(0f, 1f)
+    val dark = palette.isDark
+    val fill = remember(dark, k) {
+        Color.White.copy(alpha = if (dark) 0.08f + 0.10f * k else 0.52f + 0.26f * k)
+    }
+    val edge = remember(dark) {
+        if (dark) Color.White.copy(alpha = 0.16f) else Color(0xFF0F1B3A).copy(alpha = 0.10f)
+    }
+    return this
+        .clip(shp)
+        .background(fill, shp)
+        .border(1.dp, edge, shp)
+}
 
 /** Circular glass chip - for avatar rings, icon badges, and pill buttons. */
 @Composable

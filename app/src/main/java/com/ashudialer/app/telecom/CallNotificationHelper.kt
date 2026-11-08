@@ -31,6 +31,8 @@ object CallNotificationHelper {
 
     private var lastCallerName: String = ""
     private var lastIsIncoming: Boolean = false
+    /** 0 = a normal call, otherwise the number of people in the conference being shown. */
+    private var lastConferenceCount: Int = 0
 
     private var ongoingCallStartMillis: Long = 0L
 
@@ -357,7 +359,8 @@ object CallNotificationHelper {
         callerName: String,
         connected: Boolean = true,
         connectTimeMillis: Long = 0L,
-        onHold: Boolean = false
+        onHold: Boolean = false,
+        conferenceCount: Int = 0
     ) {
         try {
             stopAvatarPulse()
@@ -365,6 +368,7 @@ object CallNotificationHelper {
             lastIsIncoming = false
             lastCallConnected = connected
             lastCallOnHold = onHold
+            lastConferenceCount = conferenceCount
 
             if (connected) {
                 if (ongoingCallStartMillis == 0L) {
@@ -375,8 +379,11 @@ object CallNotificationHelper {
                 // Not answered yet: no start time, so nothing can tick.
                 ongoingCallStartMillis = 0L
             }
+            // v5: the conference state is spelled out in the notification ("Conference . 3 people" / "Conference on hold").
             val statusLabel = when {
                 !connected -> "Calling\u2026"
+                conferenceCount > 0 && onHold -> "Conference on hold \u00b7 $conferenceCount people"
+                conferenceCount > 0 -> "Conference \u00b7 $conferenceCount people"
                 onHold -> "On hold"
                 else -> "Ongoing call"
             }
@@ -491,7 +498,8 @@ object CallNotificationHelper {
             context, lastCallerName,
             connected = lastCallConnected,
             connectTimeMillis = ongoingCallStartMillis,
-            onHold = lastCallOnHold
+            onHold = lastCallOnHold,
+            conferenceCount = lastConferenceCount
         )
     }
 
@@ -515,6 +523,7 @@ object CallNotificationHelper {
         lastIsIncoming = false
         lastCallConnected = false
         lastCallOnHold = false
+        lastConferenceCount = 0
         ongoingCallStartMillis = 0L
     }
 
