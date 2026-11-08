@@ -156,6 +156,7 @@ private fun formatClockShort(hour: Int, minute: Int): String {
     return if (minute == 0) "$displayHour $period" else "%d:%02d %s".format(displayHour, minute, period)
 }
 
+@OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels {
