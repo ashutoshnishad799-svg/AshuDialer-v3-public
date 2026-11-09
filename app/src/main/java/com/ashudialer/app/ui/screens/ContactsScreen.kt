@@ -30,6 +30,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -72,6 +73,15 @@ import com.ashudialer.app.ui.theme.LocalDialerPalette
 import kotlinx.coroutines.launch
 import com.ashudialer.app.ui.components.glassCircle
 import com.ashudialer.app.ui.components.highlightMatch
+import com.ashudialer.app.ui.components.SearchNoResults
+import com.ashudialer.app.ui.components.SearchOverlay
+import com.ashudialer.app.ui.components.SearchPill
+import com.ashudialer.app.ui.components.SearchResultRow
+import com.ashudialer.app.ui.components.SearchSectionTitle
+import com.ashudialer.app.ui.components.rememberSearchHistory
+import com.ashudialer.app.ui.components.rememberVoiceSearch
+import com.ashudialer.app.ui.components.searchBestNumber
+import com.ashudialer.app.ui.components.searchMatchRank
 import com.ashudialer.app.ui.components.liquidGlass
 
 
@@ -120,6 +130,14 @@ fun ContactsScreen(
 ) {
     val palette = LocalDialerPalette.current
     var query by remember { mutableStateOf("") }
+    // v2.3: tapping the search bar opens the full search screen (SearchOverlay) with the person's recent searches.
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchSeed by remember { mutableStateOf("") }
+    val searchHistory = rememberSearchHistory("contacts")
+    val startVoiceSearch = rememberVoiceSearch("Say a name or number") { spoken ->
+        searchSeed = spoken
+        searchOpen = true
+    }
 
 
     var selectedContactIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -217,44 +235,15 @@ fun ContactsScreen(
         }
 
         if (showSearchBar) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    // Matches RecentsScreen's search bar fix - same
-                    // .background(palette.searchBackground) flat-fill pattern,
-                    // same liquidGlass swap so the two search bars (and every
-                    // other glassy surface on this screen) stay visually
-                    // consistent with each other.
-                    .liquidGlass(palette, RoundedCornerShape(18.dp), tintAlpha = 0.62f)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                    if (query.isEmpty()) {
-                        Text("Search Contacts", color = palette.textSecondary, fontSize = 15.sp)
-                    }
-                    BasicTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        singleLine = true,
-                        textStyle = TextStyle(color = palette.textPrimary, fontSize = 15.sp),
-                        cursorBrush = androidx.compose.ui.graphics.SolidColor(palette.accent),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                AnimatedVisibility(
-                    visible = query.isNotEmpty(),
-                    enter = fadeIn(tween(150)) + scaleIn(initialScale = 0.6f),
-                    exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.6f)
-                ) {
-                    IconButton(onClick = { query = "" }, modifier = Modifier.size(22.dp)) {
-                        Icon(Icons.Filled.Close, contentDescription = "Clear search", tint = palette.textSecondary, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
+            SearchPill(
+                hint = "Search Contacts",
+                onOpen = {
+                    searchSeed = ""
+                    searchOpen = true
+                },
+                onMic = startVoiceSearch,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
 
         Spacer(Modifier.height(14.dp))
@@ -383,6 +372,28 @@ fun ContactsScreen(
             onLetterSelected = onLetter@{ letter ->
                 val targetIndex = letterToItemIndex[letter] ?: return@onLetter
                 scope.launch { listState.scrollToItem(targetIndex) }
+            }
+        )
+    }
+
+    SearchOverlay(
+        visible = searchOpen,
+        hint = "Search Contacts",
+        seedQuery = searchSeed,
+        history = searchHistory,
+        onClose = { searchOpen = false },
+        modifier = Modifier.fillMaxSize()
+    ) { q, picked ->
+        ContactsSearchResults(
+            query = q,
+            contacts = contacts,
+            onOpen = { contact ->
+                picked(contact.displayName)
+                onOpenDetail(contact)
+            },
+            onCall = { contact ->
+                picked(contact.displayName)
+                onCall(contact)
             }
         )
     }
@@ -786,6 +797,90 @@ private fun SingleNumberContactRow(
                     tint = palette.textSecondary, modifier = Modifier.size(18.dp)
                 )
             }
+        }
+    }
+}
+
+
+// ------------------------------------------------------------------------------------------------------------------
+// v2.3 search results (shown by the search screen)
+// ------------------------------------------------------------------------------------------------------------------
+
+private data class ContactSearchHit(
+    val key: String,
+    val name: String,
+    val number: String,
+    val photoUri: String?,
+    val contact: Contact,
+    val label: String,
+    val extraNumbers: Int,
+    val rank: Int
+)
+
+/** One row per person. "su" finds Suraj and Suran at once; the best matches (name starts with it) come first. */
+private fun buildContactSearchHits(query: String, contacts: List<Contact>): List<ContactSearchHit> {
+    val q = query.trim()
+    if (q.isEmpty()) return emptyList()
+    val hits = ArrayList<ContactSearchHit>()
+    for ((contactId, entries) in contacts.groupBy { it.contactId }) {
+        val first = entries.first()
+        val numbers = entries.map { it.phoneNumber }
+        var best = searchMatchRank(first.displayName, "", q)
+        for (n in numbers) {
+            val r = searchMatchRank(first.displayName, n, q)
+            if (r >= 0 && (best < 0 || r < best)) best = r
+        }
+        if (best < 0) continue
+        val shownNumber = searchBestNumber(numbers, q)
+        val shown = entries.firstOrNull { it.phoneNumber == shownNumber } ?: first
+        hits.add(
+            ContactSearchHit(
+                key = "p_$contactId",
+                name = first.displayName,
+                number = shownNumber,
+                photoUri = entries.firstOrNull { it.photoUri != null }?.photoUri,
+                contact = shown,
+                label = shown.numberLabel,
+                extraNumbers = (numbers.distinct().size - 1).coerceAtLeast(0),
+                rank = best
+            )
+        )
+    }
+    return hits
+        .sortedWith(compareBy<ContactSearchHit> { it.rank }.thenBy { it.name.lowercase() })
+        .take(80)
+}
+
+@Composable
+private fun ContactsSearchResults(
+    query: String,
+    contacts: List<Contact>,
+    onOpen: (Contact) -> Unit,
+    onCall: (Contact) -> Unit
+) {
+    val hits = remember(query, contacts) { buildContactSearchHits(query, contacts) }
+    if (hits.isEmpty()) {
+        SearchNoResults("No contacts match \"$query\"")
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item(key = "results-title") {
+            SearchSectionTitle(if (hits.size == 1) "1 contact" else "${hits.size} contacts")
+        }
+        items(hits, key = { it.key }) { hit ->
+            val more = if (hit.extraNumbers > 0) " \u00b7 +${hit.extraNumbers} more" else ""
+            SearchResultRow(
+                name = hit.name,
+                number = hit.number,
+                photoUri = hit.photoUri,
+                query = query,
+                subtitle = hit.label + more,
+                onClick = { onOpen(hit.contact) },
+                onCall = { onCall(hit.contact) }
+            )
         }
     }
 }

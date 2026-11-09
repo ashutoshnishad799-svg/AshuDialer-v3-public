@@ -38,7 +38,9 @@ class ViewModelFactory(private val app: AshuDialerApp) : ViewModelProvider.Facto
                 app.privateSpaceRepository,
                 app.localAuthRepository,
                 app.callbackReminderRepository,
-                app.database.reportedSpamDao()
+                app.database.reportedSpamDao(),
+                app.trashRepository,
+                app.contactTransferRepository
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: $modelClass")

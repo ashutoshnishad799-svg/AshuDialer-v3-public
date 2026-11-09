@@ -233,6 +233,7 @@ class PixelInCallService : InCallService() {
                     latestSettings = it
                     CallNotificationHelper.callStyleMode = it.callNotifStyle
                     CallNotificationHelper.callLook = it.callNotifLook
+                    CallNotificationHelper.callChipEnabled = it.callStatusChip
                 }
             }
         }
@@ -326,11 +327,20 @@ class PixelInCallService : InCallService() {
 
 
             if (state == Call.STATE_ACTIVE) {
-                callKey(call)?.let { loggedAsAnswered.add(it) }
+                // v2.3: one short buzz the FIRST time this call becomes active (coming back from hold does not buzz again).
+                val firstTimeActive = callKey(call)?.let { loggedAsAnswered.add(it) } ?: false
+                if (firstTimeActive && call.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) != true) {
+                    buzzForCallEvent(connected = true)
+                }
                 maybeAutoMerge(call)
             }
 
             if (state == Call.STATE_DISCONNECTED) {
+                // v2.3: two short buzzes when a call that really connected is over. Read BEFORE the missed-call logic runs.
+                val wasConnected = callKey(call)?.let { it in loggedAsAnswered } ?: false
+                if (wasConnected && call.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) != true) {
+                    buzzForCallEvent(connected = false)
+                }
                 handleMissedCallLogging(call)
                 call.unregisterCallback(this)
             }
@@ -698,6 +708,38 @@ class PixelInCallService : InCallService() {
             }
             val pattern = VibrationPattern.fromId(patternId)
             playVibrationPattern(pattern)
+        }
+    }
+
+    /**
+     * v2.3: a short buzz when a call connects (one pulse) and when a connected call ends (two pulses). Each one can be
+     * switched off in Settings > Calls. It needs no root and no extra permission - only the normal VIBRATE permission the
+     * app already holds - and, like every vibration, it follows the phone's own vibration / silent-mode settings.
+     */
+    private fun buzzForCallEvent(connected: Boolean) {
+        val enabled = if (connected) latestSettings.vibrateOnCallConnect else latestSettings.vibrateOnCallEnd
+        if (!enabled) return
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            val effect = if (connected) {
+                VibrationEffect.createOneShot(60L, VibrationEffect.DEFAULT_AMPLITUDE)
+            } else {
+                VibrationEffect.createWaveform(longArrayOf(0L, 55L, 80L, 55L), -1)
+            }
+            // A notification-type usage: the system lets this through even when no screen of the app is in front.
+            val attributes = android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(effect, attributes)
+        } catch (e: Exception) {
+            Log.w(TAG, "Call connect/end vibration failed", e)
         }
     }
 

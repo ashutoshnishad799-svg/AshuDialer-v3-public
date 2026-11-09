@@ -92,7 +92,7 @@ import com.ashudialer.app.viewmodel.ViewModelFactory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private enum class OverlayScreen { NONE, ACCOUNT, PRIVACY_POLICY, SETTINGS, BLOCKED_NUMBERS, REPORTED_SPAM, HELP_FEEDBACK, NOTES, RECORDINGS, RECORDING_GUIDE, RECORDING_SETTINGS, RECORDING_SETUP, RECORDING_APP_CALLS_SETUP, SIM_ROUTING, VIBRATION_PATTERNS, LOCAL_BACKUP, QUIET_HOURS, CALL_INSIGHTS, ABOUT, PRIVATE_SPACE, ADD_CONTACT, UPDATE_CHECK, INCOMING_CALL_STYLE, PERSONALIZE, VOICEMAIL }
+private enum class OverlayScreen { NONE, ACCOUNT, PRIVACY_POLICY, SETTINGS, BLOCKED_NUMBERS, REPORTED_SPAM, HELP_FEEDBACK, NOTES, RECORDINGS, RECORDING_GUIDE, RECORDING_SETTINGS, RECORDING_SETUP, RECORDING_APP_CALLS_SETUP, SIM_ROUTING, VIBRATION_PATTERNS, LOCAL_BACKUP, QUIET_HOURS, CALL_INSIGHTS, ABOUT, PRIVATE_SPACE, ADD_CONTACT, UPDATE_CHECK, INCOMING_CALL_STYLE, PERSONALIZE, VOICEMAIL, TRASH, CONTACT_TRANSFER }
 
 // THE FIX for the Modules/Root-setup screen "freezing" after tapping
 // "Open Magisk" and coming back: overlay used to be plain `remember`,
@@ -581,6 +581,14 @@ class MainActivity : ComponentActivity() {
                     contactRingtoneUri = chosenUri?.toString()
                     viewModel.setContactRingtone(contact.contactId, chosenUri?.toString())
                 }
+            }
+
+            // v2.3: the Edit button on a contact opens the phone's own contact editor. When it closes, the list is read again so
+            // the new name / number shows straight away.
+            val editContactLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) { _ ->
+                viewModel.loadContacts()
             }
 
             var pendingCropUri by remember { mutableStateOf<Uri?>(null) }
@@ -1416,11 +1424,7 @@ class MainActivity : ComponentActivity() {
                                         onWhatsApp = { contact -> buttonHaptic(); openWhatsApp(contact.phoneNumber) },
                                         onShareNumber = { contact ->
                                             buttonHaptic()
-                                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                type = "text/plain"
-                                                putExtra(Intent.EXTRA_TEXT, "${contact.displayName}: ${contact.phoneNumber}")
-                                            }
-                                            context.startActivity(Intent.createChooser(shareIntent, "Share number"))
+                                            com.ashudialer.app.data.ContactShareHelper.share(context, contact)
                                         },
                                         onOpenDetail = { contact -> buttonHaptic(); selectedContactForDetail = contact },
                                         onOpenAddContact = {
@@ -1531,6 +1535,8 @@ class MainActivity : ComponentActivity() {
                                                 "Quiet Hours" -> overlay = OverlayScreen.QUIET_HOURS
                                                 "Settings" -> overlay = OverlayScreen.SETTINGS
                                                 "Blocked numbers" -> overlay = OverlayScreen.BLOCKED_NUMBERS
+                                                "Trash" -> overlay = OverlayScreen.TRASH
+                                                "Copy contacts" -> overlay = OverlayScreen.CONTACT_TRANSFER
                                                 "Reported Numbers" -> overlay = OverlayScreen.REPORTED_SPAM
                                                 "Private Space" -> {
                                                     privateSpaceStep = PrivateSpaceStep.CHECKING
@@ -1891,6 +1897,11 @@ class MainActivity : ComponentActivity() {
                                             onToggleLedFlash = { enabled -> viewModel.setLedFlashForAlerts(enabled) },
                                             onToggleVibrateOnButton = { enabled -> viewModel.setVibrateOnButtonPress(enabled) },
                                             onToggleKeepCallsInNotifications = { enabled -> viewModel.setKeepCallsInNotifications(enabled) },
+                                            onToggleCallStatusChip = { enabled -> viewModel.setCallStatusChip(enabled) },
+                                            onToggleVibrateOnCallConnect = { enabled -> viewModel.setVibrateOnCallConnect(enabled) },
+                                            onToggleVibrateOnCallEnd = { enabled -> viewModel.setVibrateOnCallEnd(enabled) },
+                                            onToggleTrash = { enabled -> viewModel.setTrashEnabled(enabled) },
+                                            onOpenTrash = { overlay = OverlayScreen.TRASH },
                                             onToggleBackEndsCall = { enabled -> viewModel.setBackEndsCall(enabled) },
                                             onToggleDisableProximity = { enabled -> viewModel.setDisableProximitySensor(enabled) },
                                             onToggleShowThumbnails = { enabled -> viewModel.setShowContactThumbnails(enabled) },
@@ -1967,6 +1978,30 @@ class MainActivity : ComponentActivity() {
                                                 modifier = Modifier.fillMaxSize()
                                             )
                                         }
+                                        OverlayScreen.TRASH -> {
+                                            val trashItems by viewModel.trashItems.collectAsState()
+                                            LaunchedEffect(Unit) { viewModel.purgeExpiredTrash() }
+                                            com.ashudialer.app.ui.screens.TrashScreen(
+                                                items = trashItems,
+                                                trashEnabled = settings.trashEnabled,
+                                                onBack = { overlay = OverlayScreen.NONE },
+                                                onToggleTrash = { enabled -> viewModel.setTrashEnabled(enabled) },
+                                                onRestore = { item ->
+                                                    viewModel.restoreTrashItem(item) { message ->
+                                                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                                onDeleteForever = { item -> viewModel.deleteTrashItemForever(item.id) },
+                                                onEmptyTrash = { viewModel.emptyTrash() },
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
+                                        OverlayScreen.CONTACT_TRANSFER -> com.ashudialer.app.ui.screens.ContactTransferScreen(
+                                            repository = viewModel.contactTransfer,
+                                            onBack = { overlay = OverlayScreen.NONE },
+                                            onContactsChanged = { viewModel.loadContacts() },
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                         OverlayScreen.BLOCKED_NUMBERS -> BlockedNumbersScreen(
                                             blockedNumbers = blockedNumbers,
                                             onBack = { overlay = OverlayScreen.NONE },
@@ -2354,7 +2389,49 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onChangePhoto = { photoPickerLauncher.launch("image/*") },
                                     onShareContact = {
-                                        com.ashudialer.app.data.ContactShareHelper.share(context, contact)
+                                        // v2.3: plain text (name + every number) - works in WhatsApp. The .vcf card is the row below it.
+                                        val allNumbers = contacts.filter { it.contactId == contact.contactId }
+                                            .map { it.phoneNumber }
+                                            .ifEmpty { listOf(contact.phoneNumber) }
+                                        com.ashudialer.app.data.ContactShareHelper.shareText(context, contact.displayName, allNumbers)
+                                    },
+                                    onShareContactCard = {
+                                        val allNumbers = contacts.filter { it.contactId == contact.contactId }
+                                            .map { it.phoneNumber }
+                                            .ifEmpty { listOf(contact.phoneNumber) }
+                                        try {
+                                            com.ashudialer.app.data.ContactShareHelper.shareAsCard(context, contact.displayName, allNumbers)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Couldn't share the contact card", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onEdit = {
+                                        val id = contact.contactId.toLongOrNull()
+                                        if (id == null) {
+                                            Toast.makeText(context, "This contact can't be edited", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            try {
+                                                val uri = android.content.ContentUris.withAppendedId(
+                                                    android.provider.ContactsContract.Contacts.CONTENT_URI, id
+                                                )
+                                                val editIntent = Intent(Intent.ACTION_EDIT).apply {
+                                                    setDataAndType(uri, android.provider.ContactsContract.Contacts.CONTENT_ITEM_TYPE)
+                                                    putExtra("finishActivityOnSaveCompleted", true)
+                                                }
+                                                editContactLauncher.launch(editIntent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "No contacts app found to edit this contact", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    onDeleteContact = {
+                                        viewModel.deleteContacts(setOf(contact.contactId))
+                                        selectedContactForDetail = null
+                                    },
+                                    deleteHint = if (settings.trashEnabled) {
+                                        "It moves to Trash and stays there for 30 days."
+                                    } else {
+                                        "This can't be undone."
                                     },
                                     onAddToHomeScreen = {
                                         if (com.ashudialer.app.data.ContactShortcutHelper.isSupported(context)) {
@@ -2364,11 +2441,8 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onShareNumber = { number ->
-                                        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                            type = "text/plain"
-                                            putExtra(android.content.Intent.EXTRA_TEXT, number)
-                                        }
-                                        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share number"))
+                                        // name + number, not the bare number
+                                        com.ashudialer.app.data.ContactShareHelper.shareText(context, contact.displayName, listOf(number))
                                     },
                                     onOpenCallHistory = {
                                         callHistoryPageContact = contact

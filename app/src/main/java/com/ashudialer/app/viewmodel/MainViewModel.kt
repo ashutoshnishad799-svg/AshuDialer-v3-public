@@ -61,7 +61,9 @@ class MainViewModel(
     private val privateSpaceRepository: com.ashudialer.app.data.PrivateSpaceRepository,
     private val localAuthRepository: com.ashudialer.app.data.LocalAuthRepository,
     private val callbackReminderRepository: com.ashudialer.app.data.CallbackReminderRepository,
-    private val reportedSpamDao: com.ashudialer.app.data.db.ReportedSpamDao
+    private val reportedSpamDao: com.ashudialer.app.data.db.ReportedSpamDao,
+    private val trashRepository: com.ashudialer.app.data.trash.TrashRepository,
+    private val contactTransferRepository: com.ashudialer.app.data.ContactTransferRepository
 ) : ViewModel() {
     val themeId: StateFlow<String> = themePreference.themeIdFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.ashudialer.app.ui.theme.AUTO_THEME_ID)
@@ -178,6 +180,70 @@ class MainViewModel(
 
     val settings = appSettingsRepository.settingsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.ashudialer.app.data.AppSettings())
+
+    // ---- Trash (v2.3) --------------------------------------------------------------------------------------------
+    val trashItems: StateFlow<List<com.ashudialer.app.data.trash.TrashItemEntity>> =
+        trashRepository.items.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** True while Trash is switched on in Settings. Read at the moment of a delete, so the switch takes effect at once. */
+    private fun trashOn(): Boolean = settings.value.trashEnabled
+
+    init {
+        // Anything older than 30 days goes for good each time the app starts.
+        viewModelScope.launch { runCatching { trashRepository.purgeExpired() } }
+    }
+
+    fun purgeExpiredTrash() {
+        viewModelScope.launch { runCatching { trashRepository.purgeExpired() } }
+    }
+
+    fun restoreTrashItem(item: com.ashudialer.app.data.trash.TrashItemEntity, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = trashRepository.restore(item)
+            if (result.success && item.kind == com.ashudialer.app.data.trash.TrashRepository.KIND_CONTACT) loadContacts()
+            onResult(result.message)
+        }
+    }
+
+    fun deleteTrashItemForever(id: Long) {
+        viewModelScope.launch { trashRepository.deleteForever(id) }
+    }
+
+    fun emptyTrash() {
+        viewModelScope.launch { trashRepository.empty() }
+    }
+
+    fun setTrashEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setTrashEnabled(enabled) }
+    }
+
+    /** Keeps these calls in Trash (when it is on) under one entry: a saved name, or the number for an unsaved caller. */
+    private suspend fun trashCalls(calls: List<SystemCallLogEntry>) {
+        if (!trashOn() || calls.isEmpty()) return
+        try {
+            calls.groupBy { it.phoneNumber }.forEach { (number, group) ->
+                val title = group.firstNotNullOfOrNull { it.displayName?.takeIf { n -> n.isNotBlank() } } ?: number
+                trashRepository.saveCalls(title, group)
+            }
+        } catch (e: Exception) {
+            // Trash is a safety net: it must never stop the delete itself
+        }
+    }
+
+    fun setCallStatusChip(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setCallStatusChip(enabled) }
+    }
+
+    fun setVibrateOnCallConnect(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setVibrateOnCallConnect(enabled) }
+    }
+
+    fun setVibrateOnCallEnd(enabled: Boolean) {
+        viewModelScope.launch { appSettingsRepository.setVibrateOnCallEnd(enabled) }
+    }
+
+    // ---- Copy / move contacts between phone, SIM and accounts, and .vcf files (v2.3) ----------------------------
+    val contactTransfer: com.ashudialer.app.data.ContactTransferRepository get() = contactTransferRepository
 
     private val _backupState = MutableStateFlow(BackupState.IDLE)
     val backupState: StateFlow<BackupState> = _backupState
@@ -478,6 +544,7 @@ class MainViewModel(
 
     fun deleteCallHistoryForNumber(phoneNumber: String) {
         viewModelScope.launch {
+            if (trashOn()) trashCalls(systemCallLogRepository.loadHistoryForNumber(phoneNumber, 1000))
             val success = systemCallLogRepository.deleteHistoryForNumber(phoneNumber)
             callLogRepository.deleteLocalHistoryForNumber(phoneNumber)
             if (success) {
@@ -516,6 +583,18 @@ class MainViewModel(
         viewModelScope.launch {
             val allIds = entries.flatMap { it.groupedIds }.toSet()
             val rowsToDelete = callLogRepository.getEntriesByIds(allIds)
+            trashCalls(
+                rowsToDelete.map {
+                    SystemCallLogEntry(
+                        phoneNumber = it.phoneNumber,
+                        displayName = it.displayName,
+                        direction = it.direction,
+                        timestampMillis = it.timestampMillis,
+                        durationSeconds = it.durationSeconds,
+                        photoUri = it.photoUri
+                    )
+                }
+            )
             rowsToDelete.forEach { row ->
                 systemCallLogRepository.deleteEntryAt(row.phoneNumber, row.timestampMillis)
             }
@@ -526,6 +605,7 @@ class MainViewModel(
 
     fun deleteSingleCallHistoryEntry(entry: SystemCallLogEntry) {
         viewModelScope.launch {
+            trashCalls(listOf(entry))
             systemCallLogRepository.deleteEntryAt(entry.phoneNumber, entry.timestampMillis)
 
 
@@ -719,6 +799,14 @@ class MainViewModel(
 
     fun deleteContacts(contactIds: Set<String>) {
         viewModelScope.launch {
+            // With Trash on, a full copy is kept for 30 days BEFORE the contact is deleted.
+            if (trashOn()) {
+                try {
+                    trashRepository.saveContacts(contactIds)
+                } catch (e: Exception) {
+                    // the delete the person asked for still goes ahead
+                }
+            }
             val success = contactsRepository.deleteContacts(contactIds)
             if (success) loadContacts()
         }
@@ -738,6 +826,16 @@ class MainViewModel(
 
     fun clearCallHistory() {
         viewModelScope.launch {
+            if (trashOn()) {
+                val everything = systemCallLogRepository.loadRecentHistory(5000)
+                if (everything.isNotEmpty()) {
+                    try {
+                        trashRepository.saveCalls("Call log cleared", everything)
+                    } catch (e: Exception) {
+                        // the clear the person asked for still goes ahead
+                    }
+                }
+            }
             callLogRepository.clearHistory()
 
 

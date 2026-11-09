@@ -934,7 +934,10 @@ class InCallActivity : ComponentActivity() {
                     // as well would race it, so this screen only tells the coordinator the
                     // exact moment the call becomes ACTIVE - that is the precise "answered"
                     // signal, which the broadcast alone cannot provide.
-                    LaunchedEffect(callState, isOutgoing) {
+                    // v2.3: also keyed on the recording switch. The settings load a moment after the call screen opens, and
+                    // when the call went ACTIVE before they had, this ran once with the switch still "off" and never again, so
+                    // auto-record silently did not start. notifyCallAnswered() is safe to call twice (it only acts once).
+                    LaunchedEffect(callState, isOutgoing, settings.callRecordingEnabled) {
                         if (callState == Call.STATE_ACTIVE && settings.callRecordingEnabled) {
                             com.ashudialer.app.appcalls.recording.CallRecordingCoordinator
                                 .getInstance(applicationContext)

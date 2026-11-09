@@ -1,5 +1,80 @@
 # Changelog
 
+## 2.3.0 - 9 November 2026  (new search, Trash, copy contacts, call chip)
+
+Modified edition of 2.2.0. Files changed since 2.2.0 are listed at the bottom (GPL section 5(a)).
+
+### Search (Recents and Contacts)
+- **The search bar is a button now.** Tapping it opens a full search screen that grows down from the top with one smooth motion
+  (it follows the animation speed / off switch). The keyboard comes up after the motion.
+- **Recent searches** are listed first, newest on top, each with a small **x** to remove just that one, and a small
+  **Clear search history** at the top right. Recents and Contacts keep separate lists. They stay on the phone.
+- **Mic button** in the bar and in the search screen: opens the phone's voice-input screen (no extra permission) and puts what
+  was said in the field. A phone without a speech service shows a short message instead of failing.
+- **Results while typing**: "su" already lists Suraj, Suran ... with their numbers, the typed part coloured and tinted, and the
+  colour grows with every letter. Best matches (the name starts with it) come first. Words in any order work ("rai ritik").
+- **Fixed: "Ritik Rai" hid "Ritik Rai 2".** Saved contacts used to be listed only when no recent call matched at all, so one
+  matching call hid every other matching contact. Now every matching contact is a row, and one with no call reads
+  **No recent call found**. Calls from unsaved numbers that match are rows too.
+
+### Contacts
+- **Edit button** at the top right of a contact (it was missing). It opens the phone's own contact editor; the list refreshes
+  when it closes.
+- **Sharing a contact is plain text now** - the name, then each number on its own line - which WhatsApp, SMS, Telegram and mail all
+  take. (It used to send only a .vcf file with a type WhatsApp refuses.) A person with two numbers shares both. The old card is
+  still there as **Share as contact card (.vcf)**. Sharing a number from a contact sends the name with it.
+- **Delete contact** row at the bottom of a contact (asks first; says whether it goes to Trash).
+- **Copy contacts** (More > Data & backup): choose where they are now (this phone, a Google account, a SIM, or a .vcf file) and
+  where they should go, tick the contacts, then Copy or Move. Any place can also be saved as a .vcf file, and a .vcf file can be
+  imported into the phone, a Google account or a SIM. Phone <-> Google copies every field (photo thumbnail too); a SIM keeps only
+  a name and a number (long names are shortened); contacts already at the destination are skipped; Move removes from the old
+  place only after everything arrived, and is not offered into a SIM. Needs no root - only the Contacts permission.
+  Some phones do not let apps read or write the SIM; the screen says so instead of failing silently.
+
+### Trash
+- Deleted **contacts** (every field and the photo thumbnail) and deleted **calls** - from saved and from unsaved numbers, one call,
+  one number, a selection, or the whole call log - stay in **Trash for 30 days** (More > Trash, or Settings > Trash).
+- Filters: All / Contacts / Recent calls / Unsaved numbers. **Restore**, **Delete forever** and **Empty Trash**; each item shows the
+  days left. Restoring a contact puts it back in its original account when that still exists; restoring calls writes them back
+  into the call log.
+- **Settings > Trash** (and the switch at the top of the Trash page) turns it off: deleting is permanent again and nothing new is
+  kept. Trash has its own small database file, so the main call-log database is untouched.
+
+### Calls
+- **Status-bar call chip: the seconds no longer run while the call is still dialling.** Cause: Android's chip counts from the
+  notification's `when` time, which defaults to "the moment it was built" - so it ticked from the second the call was placed even
+  though the timer inside the notification was already off. `when` is 0 until the call connects (the chip shows only its icon) and
+  the real connect time after. On Android 16+ the chip also says **Calling** until then. Settings > Calls > **Status bar call chip**
+  turns the chip off (the call then uses the themed notification card).
+- **Vibrate when a call connects** (one short buzz) and **when a call ends** (two short ones), both on by default, each switchable
+  in Settings > Calls. No root and no extra permission; like every vibration it follows the phone's vibration / silent settings.
+
+### Call Insights
+- Tapping a bar of the Daily activity chart (or a day in the list) now **animates**: the day page grows in while the list shrinks
+  back, and back reverses it. The list keeps its scroll position.
+- The **day page** has more: longest and average call, **Calls by hour** (24 bars that grow in one after another) and **Who you
+  spoke with**.
+
+### Call recording (Shizuku)
+- **"Couldn't prepare the recording helper file"**: the helper (scrcpy server) could not be put in place before recording. It now
+  replaces a damaged / read-only leftover file, writes the new copy under a temporary name and moves it in only when it passes
+  its checksum, and tries a second folder (the app's cache folder on shared storage) when the first one fails. If it still
+  fails, the "Call not recorded" notification now says WHY in brackets (for example "the helper file is missing from this
+  build", "cannot write ...", "did not pass its checksum") instead of just "Try again".
+- Auto-record could be skipped when the call became active before the settings had loaded (the check ran once with the switch
+  still "off"). It now re-checks when the settings arrive.
+
+### Notes
+- Version 2.3.0 (versionCode 20).
+- Written without a compiler in reach: it has not been built or run yet. If Gradle reports an error, send the first error line.
+
+### Files changed since 2.2.0
+Changed: build.gradle.kts, AndroidManifest.xml, MainActivity.kt, InCallActivity.kt, ServerExtractor.kt, AppCallRecordingEngine.kt, AshuDialerApp.kt, MainViewModel.kt, ViewModelFactory.kt,
+AppSettingsRepository.kt, SystemCallLogRepository.kt, CallLogRepository.kt, CallInsightsRepository.kt, ContactShareHelper.kt,
+CallNotificationHelper.kt, PixelInCallService.kt, SearchHighlight.kt, RecentsScreen.kt, ContactsScreen.kt, ContactDetailScreen.kt,
+CallInsightsScreen.kt, MoreScreen.kt, SettingsScreen.kt.
+Added: SearchOverlay.kt, TrashScreen.kt, ContactTransferScreen.kt, TrashDatabase.kt, TrashRepository.kt, ContactTransferRepository.kt.
+
 ## 2.2.0 - 8 November 2026  (conference calls, floating dialer, search)
 
 Modified edition of 2.1.0. Files changed since 2.1.0 are listed at the bottom (GPL section 5(a)).

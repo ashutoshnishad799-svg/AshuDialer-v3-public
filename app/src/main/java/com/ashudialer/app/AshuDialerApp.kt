@@ -87,6 +87,11 @@ class AshuDialerApp : Application() {
     lateinit var localAuthRepository: com.ashudialer.app.data.LocalAuthRepository
         private set
     lateinit var callbackReminderRepository: com.ashudialer.app.data.CallbackReminderRepository
+
+    // v2.3: Trash (30-day undo for deleted contacts / calls) and copying contacts between the phone, SIMs and accounts.
+    lateinit var trashRepository: com.ashudialer.app.data.trash.TrashRepository
+
+    lateinit var contactTransferRepository: com.ashudialer.app.data.ContactTransferRepository
         private set
 
     /**
@@ -122,6 +127,13 @@ class AshuDialerApp : Application() {
         callLogRepository = CallLogRepository(database.callLogDao())
         systemCallLogRepository = SystemCallLogRepository(this)
         contactsRepository = ContactsRepository(this)
+        trashRepository = com.ashudialer.app.data.trash.TrashRepository(
+            this,
+            com.ashudialer.app.data.trash.TrashDatabase.getInstance(this).trashDao(),
+            systemCallLogRepository,
+            callLogRepository
+        )
+        contactTransferRepository = com.ashudialer.app.data.ContactTransferRepository(this)
         themePreference = ThemePreference(this)
         appSettingsRepository = AppSettingsRepository(this)
         callRecorder = CallRecorder(this)

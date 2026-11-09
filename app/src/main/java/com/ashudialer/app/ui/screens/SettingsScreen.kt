@@ -66,6 +66,11 @@ fun SettingsScreen(
     onToggleLedFlash: (Boolean) -> Unit,
     onToggleVibrateOnButton: (Boolean) -> Unit,
     onToggleKeepCallsInNotifications: (Boolean) -> Unit,
+    onToggleCallStatusChip: (Boolean) -> Unit = {},
+    onToggleVibrateOnCallConnect: (Boolean) -> Unit = {},
+    onToggleVibrateOnCallEnd: (Boolean) -> Unit = {},
+    onToggleTrash: (Boolean) -> Unit = {},
+    onOpenTrash: () -> Unit = {},
     onToggleBackEndsCall: (Boolean) -> Unit,
     onToggleDisableProximity: (Boolean) -> Unit,
     onToggleShowThumbnails: (Boolean) -> Unit,
@@ -181,12 +186,49 @@ fun SettingsScreen(
 
             item {
                 Spacer(Modifier.height(20.dp))
+                SectionLabel("Trash", palette)
+                SettingsCard(palette) {
+                    ToggleRow(
+                        title = "Keep deleted items in Trash",
+                        subtitle = "Deleted contacts and calls can be restored for 30 days",
+                        checked = settings.trashEnabled, palette = palette, onToggle = onToggleTrash
+                    )
+                    HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
+                    NavRow(
+                        title = "Open Trash",
+                        subtitle = "Restore or permanently delete",
+                        palette = palette,
+                        onClick = onOpenTrash
+                    )
+                }
+            }
+
+            item {
+                Spacer(Modifier.height(20.dp))
                 SectionLabel("Calls", palette)
                 SettingsCard(palette) {
                     ToggleRow(
                         title = "Keep calls in notifications",
                         subtitle = "Leaves the call notification visible after it ends",
                         checked = settings.keepCallsInNotifications, palette = palette, onToggle = onToggleKeepCallsInNotifications
+                    )
+                    HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
+                    ToggleRow(
+                        title = "Status bar call chip",
+                        subtitle = "Shows the call and its timer in the status bar while you use another app. The timer starts when the call connects. Android 12 and newer",
+                        checked = settings.callStatusChip, palette = palette, onToggle = onToggleCallStatusChip
+                    )
+                    HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
+                    ToggleRow(
+                        title = "Vibrate when a call connects",
+                        subtitle = "One short buzz the moment the other person picks up (or you answer)",
+                        checked = settings.vibrateOnCallConnect, palette = palette, onToggle = onToggleVibrateOnCallConnect
+                    )
+                    HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
+                    ToggleRow(
+                        title = "Vibrate when a call ends",
+                        subtitle = "Two short buzzes when a connected call is over",
+                        checked = settings.vibrateOnCallEnd, palette = palette, onToggle = onToggleVibrateOnCallEnd
                     )
                     HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
                     ToggleRow(

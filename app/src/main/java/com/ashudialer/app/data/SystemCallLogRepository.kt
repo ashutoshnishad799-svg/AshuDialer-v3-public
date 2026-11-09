@@ -309,6 +309,40 @@ class SystemCallLogRepository(private val context: Context) {
         imported
     }
 
+    /**
+     * Puts calls back into the phone's call log (Trash uses this). Returns how many were written. A call that is already
+     * in the log (same number and same time) is not added a second time.
+     */
+    suspend fun restoreEntries(entries: List<SystemCallLogEntry>): Int = withContext(Dispatchers.IO) {
+        if (!hasCallLogPermission()) return@withContext 0
+        var restored = 0
+        for (entry in entries) {
+            try {
+                val alreadyThere = context.contentResolver.query(
+                    CallLog.Calls.CONTENT_URI,
+                    arrayOf(CallLog.Calls._ID),
+                    "${CallLog.Calls.NUMBER} = ? AND ${CallLog.Calls.DATE} = ?",
+                    arrayOf(entry.phoneNumber, entry.timestampMillis.toString()),
+                    null
+                )?.use { it.moveToFirst() } ?: false
+                if (alreadyThere) continue
+                val values = android.content.ContentValues().apply {
+                    put(CallLog.Calls.NUMBER, entry.phoneNumber)
+                    val cachedName = entry.displayName
+                    if (!cachedName.isNullOrBlank()) put(CallLog.Calls.CACHED_NAME, cachedName)
+                    put(CallLog.Calls.TYPE, entry.direction.toSystemType())
+                    put(CallLog.Calls.DATE, entry.timestampMillis)
+                    put(CallLog.Calls.DURATION, entry.durationSeconds)
+                    put(CallLog.Calls.NEW, 0)
+                }
+                if (context.contentResolver.insert(CallLog.Calls.CONTENT_URI, values) != null) restored++
+            } catch (e: Exception) {
+                // skip this one call; the rest are still put back
+            }
+        }
+        restored
+    }
+
     private fun CallDirection.toSystemType(): Int = when (this) {
         CallDirection.INCOMING -> CallLog.Calls.INCOMING_TYPE
         CallDirection.OUTGOING -> CallLog.Calls.OUTGOING_TYPE

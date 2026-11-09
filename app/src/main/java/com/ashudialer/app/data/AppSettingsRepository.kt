@@ -57,6 +57,18 @@ data class AppSettings(
 
     val keepCallsInNotifications: Boolean = false,
 
+    // v2.3 - Trash: a deleted contact / call stays recoverable for 30 days. On by default; turning it off makes deletes
+    // permanent again (and Trash stops collecting anything new).
+    val trashEnabled: Boolean = true,
+
+    // v2.3 - the little call chip Android shows in the status bar during a call (Android 12+ with the system call
+    // style). Off = the call shows as a normal notification only, with no chip.
+    val callStatusChip: Boolean = true,
+
+    // v2.3 - a short buzz the moment a call connects, and another when it ends. Needs no extra permission.
+    val vibrateOnCallConnect: Boolean = true,
+    val vibrateOnCallEnd: Boolean = true,
+
     val backEndsCall: Boolean = false,
 
     val disableProximitySensor: Boolean = false,
@@ -250,6 +262,10 @@ class AppSettingsRepository(private val context: Context) {
     private val keyVibrateOnButton = booleanPreferencesKey("vibrate_on_button_press")
     private val keyFullScreenIncoming = booleanPreferencesKey("always_full_screen_incoming")
     private val keyKeepCallsInNotifications = booleanPreferencesKey("keep_calls_in_notifications")
+    private val keyTrashEnabled = booleanPreferencesKey("trash_enabled")
+    private val keyCallStatusChip = booleanPreferencesKey("call_status_chip")
+    private val keyVibrateOnCallConnect = booleanPreferencesKey("vibrate_on_call_connect")
+    private val keyVibrateOnCallEnd = booleanPreferencesKey("vibrate_on_call_end")
     private val keyBackEndsCall = booleanPreferencesKey("back_ends_call")
     private val keyDisableProximity = booleanPreferencesKey("disable_proximity_sensor")
     private val keyShowThumbnails = booleanPreferencesKey("show_contact_thumbnails")
@@ -307,6 +323,10 @@ class AppSettingsRepository(private val context: Context) {
             vibrateOnButtonPress = prefs[keyVibrateOnButton] ?: true,
             alwaysFullScreenIncoming = prefs[keyFullScreenIncoming] ?: false,
             keepCallsInNotifications = prefs[keyKeepCallsInNotifications] ?: false,
+            trashEnabled = prefs[keyTrashEnabled] ?: true,
+            callStatusChip = prefs[keyCallStatusChip] ?: true,
+            vibrateOnCallConnect = prefs[keyVibrateOnCallConnect] ?: true,
+            vibrateOnCallEnd = prefs[keyVibrateOnCallEnd] ?: true,
             backEndsCall = prefs[keyBackEndsCall] ?: false,
             disableProximitySensor = prefs[keyDisableProximity] ?: false,
             showContactThumbnails = prefs[keyShowThumbnails] ?: true,
@@ -451,6 +471,22 @@ class AppSettingsRepository(private val context: Context) {
 
     suspend fun setKeepCallsInNotifications(enabled: Boolean) {
         context.settingsDataStore.edit { it[keyKeepCallsInNotifications] = enabled }
+    }
+
+    suspend fun setTrashEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[keyTrashEnabled] = enabled }
+    }
+
+    suspend fun setCallStatusChip(enabled: Boolean) {
+        context.settingsDataStore.edit { it[keyCallStatusChip] = enabled }
+    }
+
+    suspend fun setVibrateOnCallConnect(enabled: Boolean) {
+        context.settingsDataStore.edit { it[keyVibrateOnCallConnect] = enabled }
+    }
+
+    suspend fun setVibrateOnCallEnd(enabled: Boolean) {
+        context.settingsDataStore.edit { it[keyVibrateOnCallEnd] = enabled }
     }
 
     suspend fun setBackEndsCall(enabled: Boolean) {

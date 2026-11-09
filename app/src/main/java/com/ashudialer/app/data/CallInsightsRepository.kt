@@ -49,7 +49,13 @@ data class DailyCallSummary(
     val incomingCalls: Int,
     val outgoingCalls: Int,
     val missedCalls: Int,
-    val talkTimeSeconds: Int
+    val talkTimeSeconds: Int,
+    // v2.3 - what the day page (opened by tapping a bar of the chart) shows beyond the totals:
+    /** Calls in each hour of that day, 24 entries (index 0 = 12-1 AM). */
+    val hourlyCounts: List<Int> = emptyList(),
+    val longestCallSeconds: Int = 0,
+    /** Who that day's calls were with, most calls first (at most 5). */
+    val topPeople: List<ContactTimeShare> = emptyList()
 )
 
 data class CallInsights(
@@ -206,6 +212,18 @@ class CallInsightsRepository(private val dao: CallLogDao) {
             val start = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -daysAgo) }.timeInMillis
             val end = start + 86_400_000L
             val dayEntries = entries.filter { it.timestampMillis in start until end }
+            val hourly = IntArray(24)
+            dayEntries.forEach { hourly[millisToHourOfDay(it.timestampMillis).coerceIn(0, 23)]++ }
+            val talked = dayEntries.filter { it.direction != CallDirection.MISSED && it.direction != CallDirection.REJECTED }
+            val people = dayEntries.groupBy { it.phoneNumber }.map { (number, calls) ->
+                ContactTimeShare(
+                    displayName = calls.firstNotNullOfOrNull { c -> c.displayName?.takeIf { n -> n.isNotBlank() } } ?: number,
+                    phoneNumber = number,
+                    totalSeconds = calls.filter { c -> c.direction != CallDirection.MISSED && c.direction != CallDirection.REJECTED }
+                        .sumOf { c -> c.durationSeconds },
+                    callCount = calls.size
+                )
+            }.sortedWith(compareByDescending<ContactTimeShare> { it.callCount }.thenByDescending { it.totalSeconds }).take(5)
             DailyCallSummary(
                 dateKey = start.toString(),
                 label = fmt.format(java.util.Date(start)),
@@ -213,7 +231,10 @@ class CallInsightsRepository(private val dao: CallLogDao) {
                 incomingCalls = dayEntries.count { it.direction == CallDirection.INCOMING },
                 outgoingCalls = dayEntries.count { it.direction == CallDirection.OUTGOING },
                 missedCalls = dayEntries.count { it.direction == CallDirection.MISSED },
-                talkTimeSeconds = dayEntries.filter { it.direction != CallDirection.MISSED && it.direction != CallDirection.REJECTED }.sumOf { it.durationSeconds }
+                talkTimeSeconds = dayEntries.filter { it.direction != CallDirection.MISSED && it.direction != CallDirection.REJECTED }.sumOf { it.durationSeconds },
+                hourlyCounts = hourly.toList(),
+                longestCallSeconds = talked.maxOfOrNull { it.durationSeconds } ?: 0,
+                topPeople = people
             )
         }
     }

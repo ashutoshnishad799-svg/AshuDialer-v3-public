@@ -26,6 +26,26 @@ class CallLogRepository(private val dao: CallLogDao) {
         dao.observeMissed().map { entries -> groupConsecutive(entries) }
 
 
+    /**
+     * Trash: puts restored calls straight into the app's own list. The next system sync only looks at the newest few
+     * hundred calls, so an older restored call would otherwise stay invisible until then.
+     */
+    suspend fun restoreEntries(entries: List<SystemCallLogEntry>) {
+        if (entries.isEmpty()) return
+        dao.insertAll(
+            entries.map {
+                CallLogEntity(
+                    phoneNumber = it.phoneNumber,
+                    displayName = it.displayName,
+                    direction = it.direction,
+                    timestampMillis = it.timestampMillis,
+                    durationSeconds = it.durationSeconds,
+                    photoUri = it.photoUri
+                )
+            }
+        )
+    }
+
     suspend fun syncFromSystem(systemRepo: SystemCallLogRepository) {
         val systemEntries = systemRepo.loadRecentHistory()
         if (systemEntries.isEmpty()) return

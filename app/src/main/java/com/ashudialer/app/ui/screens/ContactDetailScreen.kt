@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Videocam
@@ -74,6 +75,7 @@ import java.util.Date
 import java.util.Locale
 import com.ashudialer.app.ui.components.glassCard
 import com.ashudialer.app.ui.components.glassCircle
+import com.ashudialer.app.ui.components.liquidGlass
 
 
 @Composable
@@ -95,6 +97,13 @@ fun ContactDetailScreen(
     onNoteChange: (String) -> Unit,
     onChangePhoto: () -> Unit,
     onShareContact: () -> Unit,
+    // v2.3: the contact card (.vcf) as a second way to share; the normal share is plain text (works in WhatsApp).
+    onShareContactCard: () -> Unit = {},
+    // v2.3: opens the phone's contact editor for this contact.
+    onEdit: () -> Unit = {},
+    // v2.3: null hides the row. The hint under the title says whether the contact goes to Trash or is gone for good.
+    onDeleteContact: (() -> Unit)? = null,
+    deleteHint: String = "This can't be undone.",
     onAddToHomeScreen: () -> Unit = {},
     onShareNumber: (String) -> Unit = {},
     onOpenCallHistory: () -> Unit = {},
@@ -111,6 +120,7 @@ fun ContactDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val palette = LocalDialerPalette.current
+    var confirmDelete by remember { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize().background(palette.opaqueBackground)) {
         LazyColumn(
@@ -129,7 +139,7 @@ fun ContactDetailScreen(
                 .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.displayCutout))
         ) {
             item {
-                TopBar(onBack = onBack, palette = palette)
+                TopBar(onBack = onBack, onEdit = onEdit, palette = palette)
                 HeaderSection(
                     contact = contact,
                     isFavorite = isFavorite,
@@ -172,7 +182,9 @@ fun ContactDetailScreen(
             item {
                 GlassCard(palette = palette, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Column {
-                        SimpleRow(label = "Share contact", palette = palette, onClick = onShareContact)
+                        SimpleRow(label = "Share contact", subtitle = "Name and number as text", palette = palette, onClick = onShareContact)
+                        HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
+                        SimpleRow(label = "Share as contact card (.vcf)", palette = palette, onClick = onShareContactCard)
                         HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
                         SimpleRow(label = "Add to Home Screen", palette = palette, onClick = onAddToHomeScreen)
                         HorizontalDivider(color = palette.cardBorder, thickness = 1.dp)
@@ -232,13 +244,42 @@ fun ContactDetailScreen(
                 }
             }
 
+            if (onDeleteContact != null) {
+                item {
+                    GlassCard(palette = palette, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        SimpleRow(label = "Delete contact", palette = palette, destructive = true, onClick = { confirmDelete = true })
+                    }
+                }
+            }
+
             item { Spacer(Modifier.height(24.dp)) }
         }
+    }
+
+    if (confirmDelete && onDeleteContact != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete ${contact.displayName}?") },
+            text = { Text(deleteHint) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmDelete = false
+                    onDeleteContact()
+                }) {
+                    Text("Delete", color = palette.danger)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmDelete = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
 @Composable
-private fun TopBar(onBack: () -> Unit, palette: DialerPalette) {
+private fun TopBar(onBack: () -> Unit, onEdit: () -> Unit, palette: DialerPalette) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,7 +288,23 @@ private fun TopBar(onBack: () -> Unit, palette: DialerPalette) {
         GlassIconButton(onClick = onBack, palette = palette) {
             Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = palette.textPrimary, modifier = Modifier.size(20.dp))
         }
-        Spacer(Modifier.width(1.dp))
+        // v2.3: THE FIX for "there is no Edit button on a contact" - this bar only ever had the back arrow. Edit sits at the
+        // top right as a labelled pill, so it is easy to find, and opens the phone's contact editor.
+        val pill = RoundedCornerShape(20.dp)
+        Row(
+            modifier = Modifier
+                .height(40.dp)
+                .liquidGlass(palette, pill)
+                .clip(pill)
+                .clickable(onClick = onEdit)
+                .padding(horizontal = 14.dp)
+                .padding(end = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Filled.Edit, contentDescription = "Edit contact", tint = palette.accent, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Edit", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = palette.accent)
+        }
     }
 }
 

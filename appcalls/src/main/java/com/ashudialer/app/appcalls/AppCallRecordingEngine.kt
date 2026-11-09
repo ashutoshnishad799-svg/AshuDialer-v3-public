@@ -94,10 +94,12 @@ class AppCallRecordingEngine(private val context: Context) {
         activeCodec = codec
         val resolvedBitRate = bitRate.takeIf { it > 0 } ?: codec.defaultBitRate
 
-        val serverPath = ScrcpyConfig.getServerPath(context)
-        if (!ServerExtractor.ensureServerFile(context, serverPath)) {
-            throw AppCallPipelineException("Couldn't prepare the recording helper file. Try again.")
-        }
+        // v2.3: tries the normal folder, then a second one, replaces a stale file, and says WHY when it still cannot.
+        val serverPath = ServerExtractor.prepareServerFile(context)
+            ?: throw AppCallPipelineException(
+                "Couldn't prepare the recording helper file" +
+                    (ServerExtractor.lastError.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "") + ". Try again."
+            )
 
         val stream = try {
             outputFile.parentFile?.mkdirs()

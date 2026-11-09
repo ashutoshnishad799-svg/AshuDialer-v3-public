@@ -10,7 +10,15 @@
  */
 package com.ashudialer.app.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -18,6 +26,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -49,6 +58,7 @@ import com.ashudialer.app.ui.components.Avatar
 import com.ashudialer.app.ui.components.bounceClick
 import com.ashudialer.app.ui.components.staggerIn
 import com.ashudialer.app.ui.theme.DialerPalette
+import com.ashudialer.app.ui.theme.LocalAshuStyle
 import com.ashudialer.app.ui.theme.LocalDialerPalette
 import com.ashudialer.app.ui.components.glassCard
 
@@ -70,12 +80,61 @@ fun CallInsightsScreen(
     onSelectedDayChange: (DailyCallSummary?) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val palette = LocalDialerPalette.current
+    val style = LocalAshuStyle.current
+    // Kept here, not inside the list page, so the list is exactly where it was when the person comes back from a day.
+    val listState = rememberLazyListState()
 
-    if (selectedDay != null) {
-        DayInsightDetailScreen(summary = selectedDay, onBack = { onSelectedDayChange(null) }, modifier = modifier)
-        return
+    // v2.3: THE FIX for "tapping a graph bar opens the day page with no animation". The day page used to REPLACE this
+    // screen in one frame. Now the two pages swap with a motion: opening a day grows the day page in (scale + rise +
+    // fade) while the list shrinks back and fades; going back plays the same thing in reverse. It follows the app's
+    // animation speed / off switch (style.ms).
+    AnimatedContent(
+        targetState = selectedDay,
+        modifier = modifier.fillMaxSize(),
+        label = "insights-page",
+        transitionSpec = {
+            if (targetState != null) {
+                (fadeIn(tween(style.ms(300), delayMillis = style.ms(70))) +
+                    scaleIn(tween(style.ms(380), easing = FastOutSlowInEasing), initialScale = 0.88f) +
+                    slideInVertically(tween(style.ms(380), easing = FastOutSlowInEasing)) { full -> full / 12 }) togetherWith
+                    (fadeOut(tween(style.ms(160))) +
+                        scaleOut(tween(style.ms(300), easing = FastOutSlowInEasing), targetScale = 0.94f))
+            } else {
+                (fadeIn(tween(style.ms(280), delayMillis = style.ms(60))) +
+                    scaleIn(tween(style.ms(320), easing = FastOutSlowInEasing), initialScale = 0.94f)) togetherWith
+                    (fadeOut(tween(style.ms(160))) +
+                        scaleOut(tween(style.ms(300), easing = FastOutSlowInEasing), targetScale = 0.88f) +
+                        slideOutVertically(tween(style.ms(300), easing = FastOutSlowInEasing)) { full -> full / 12 })
+            }
+        }
+    ) { day ->
+        if (day != null) {
+            DayInsightDetailScreen(summary = day, onBack = { onSelectedDayChange(null) }, modifier = Modifier.fillMaxSize())
+        } else {
+            InsightsListPage(
+                insights = insights,
+                period = period,
+                onPeriodChange = onPeriodChange,
+                onBack = onBack,
+                onSelectedDayChange = onSelectedDayChange,
+                listState = listState,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
+}
+
+@Composable
+private fun InsightsListPage(
+    insights: CallInsights?,
+    period: InsightsPeriod,
+    onPeriodChange: (InsightsPeriod) -> Unit,
+    onBack: () -> Unit,
+    onSelectedDayChange: (DailyCallSummary?) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalDialerPalette.current
 
     Column(modifier = modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -96,7 +155,7 @@ fun CallInsightsScreen(
             return@Column
         }
 
-        LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
+        LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp), state = listState, contentPadding = PaddingValues(bottom = 28.dp)) {
             item {
                 Spacer(Modifier.height(12.dp))
                 // Large hero card: the visual hierarchy now matches a full-screen analytics page instead of a stack of small cards.
@@ -398,7 +457,7 @@ private fun DayInsightDetailScreen(summary: DailyCallSummary, onBack: () -> Unit
     val palette = LocalDialerPalette.current
     Column(modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Filled.Close, "Back", tint = palette.textPrimary) }
+            IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, "Back", tint = palette.textPrimary) }
             Column(Modifier.weight(1f)) {
                 Text(summary.label, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = palette.textPrimary)
                 Text("Complete daily call breakdown", fontSize = 12.5.sp, color = palette.textSecondary)
@@ -408,7 +467,7 @@ private fun DayInsightDetailScreen(summary: DailyCallSummary, onBack: () -> Unit
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
             item {
                 Spacer(Modifier.height(8.dp))
-                Column(Modifier.fillMaxWidth().glassCard(palette, 24.dp).padding(20.dp)) {
+                Column(Modifier.fillMaxWidth().staggerIn(0).glassCard(palette, 24.dp).padding(20.dp)) {
                     Text("${summary.totalCalls}", fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, color = palette.textPrimary)
                     Text("Total calls", fontSize = 13.sp, color = palette.textSecondary)
                     Spacer(Modifier.height(16.dp))
@@ -416,11 +475,22 @@ private fun DayInsightDetailScreen(summary: DailyCallSummary, onBack: () -> Unit
                         StatCard("Talk time", formatDurationCompact(summary.talkTimeSeconds), palette, modifier = Modifier.weight(1f))
                         StatCard("Missed", summary.missedCalls.toString(), palette, accentColor = if (summary.missedCalls > 0) palette.danger else null, modifier = Modifier.weight(1f))
                     }
+                    if (summary.longestCallSeconds > 0) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            StatCard("Longest call", formatDurationCompact(summary.longestCallSeconds), palette, modifier = Modifier.weight(1f))
+                            StatCard(
+                                "Average call",
+                                formatDurationCompact(averageTalkSeconds(summary)),
+                                palette, modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
             }
             item {
-                Column(Modifier.fillMaxWidth().glassCard(palette, 20.dp).padding(8.dp)) {
+                Column(Modifier.fillMaxWidth().staggerIn(1).glassCard(palette, 20.dp).padding(8.dp)) {
                     LargeDirectionRow(Icons.Filled.CallReceived, "Incoming calls", summary.incomingCalls, palette.accent, palette)
                     HorizontalDivider(color = palette.cardBorder)
                     LargeDirectionRow(Icons.Filled.CallMade, "Outgoing calls", summary.outgoingCalls, palette.accent, palette)
@@ -429,8 +499,20 @@ private fun DayInsightDetailScreen(summary: DailyCallSummary, onBack: () -> Unit
                 }
                 Spacer(Modifier.height(12.dp))
             }
+            if (summary.hourlyCounts.any { it > 0 }) {
+                item {
+                    HourlyBreakdownCard(summary.hourlyCounts, palette, Modifier.staggerIn(2))
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+            if (summary.topPeople.isNotEmpty()) {
+                item {
+                    TopPeopleCard(summary.topPeople, palette, Modifier.staggerIn(3))
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
             item {
-                Column(Modifier.fillMaxWidth().glassCard(palette, 20.dp).padding(18.dp)) {
+                Column(Modifier.fillMaxWidth().staggerIn(4).glassCard(palette, 20.dp).padding(18.dp)) {
                     Text("Day snapshot", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
                     Spacer(Modifier.height(10.dp))
                     Text("Incoming + outgoing = ${summary.incomingCalls + summary.outgoingCalls} connected attempts", fontSize = 12.5.sp, color = palette.textSecondary)
@@ -438,6 +520,91 @@ private fun DayInsightDetailScreen(summary: DailyCallSummary, onBack: () -> Unit
                     Text("Talk time = ${formatDurationCompact(summary.talkTimeSeconds)}", fontSize = 12.5.sp, color = palette.textSecondary, modifier = Modifier.padding(top = 5.dp))
                 }
             }
+        }
+    }
+}
+
+/** Average length of the calls that were actually answered that day (0 when there were none). */
+private fun averageTalkSeconds(summary: DailyCallSummary): Int {
+    val connected = summary.incomingCalls + summary.outgoingCalls
+    return if (connected <= 0) 0 else summary.talkTimeSeconds / connected
+}
+
+/** 24 bars, one per hour of the day. They grow up from the bottom one after another when the page opens. */
+@Composable
+private fun HourlyBreakdownCard(counts: List<Int>, palette: DialerPalette, modifier: Modifier = Modifier) {
+    val style = LocalAshuStyle.current
+    val maxCount = (counts.maxOrNull() ?: 0).coerceAtLeast(1)
+    val busiest = counts.indices.maxByOrNull { counts[it] } ?: 0
+    var grown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { grown = true }
+
+    Column(modifier.fillMaxWidth().glassCard(palette, 20.dp).padding(18.dp)) {
+        Text("Calls by hour", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
+        Text("Busiest around ${hourLabel(busiest)}", fontSize = 12.5.sp, color = palette.textSecondary)
+        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.fillMaxWidth().height(96.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            counts.forEachIndexed { hour, count ->
+                val target = if (grown) count.toFloat() / maxCount else 0f
+                val fraction by animateFloatAsState(
+                    targetValue = target,
+                    animationSpec = tween(style.ms(520), delayMillis = style.ms(hour * 18), easing = FastOutSlowInEasing),
+                    label = "hour-bar"
+                )
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight(if (count == 0) 0.04f else (0.06f + 0.94f * fraction).coerceIn(0.04f, 1f))
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(
+                            when {
+                                count == 0 -> palette.cardBorder
+                                hour == busiest -> palette.accent
+                                else -> palette.accent.copy(alpha = 0.55f)
+                            }
+                        )
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf("12 AM", "6 AM", "12 PM", "6 PM", "11 PM").forEach {
+                Text(it, fontSize = 10.5.sp, color = palette.textSecondary)
+            }
+        }
+    }
+}
+
+private fun hourLabel(hour: Int): String {
+    val h12 = if (hour % 12 == 0) 12 else hour % 12
+    return "$h12 ${if (hour < 12) "AM" else "PM"}"
+}
+
+@Composable
+private fun TopPeopleCard(people: List<ContactTimeShare>, palette: DialerPalette, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().glassCard(palette, 20.dp).padding(vertical = 8.dp)) {
+        Text(
+            "Who you spoke with", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+        )
+        people.forEachIndexed { index, person ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Avatar(name = person.displayName, photoUri = null, size = 38.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(person.displayName, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary, maxLines = 1)
+                    val calls = if (person.callCount == 1) "1 call" else "${person.callCount} calls"
+                    Text(
+                        if (person.totalSeconds > 0) "$calls \u00b7 ${formatDurationCompact(person.totalSeconds)}" else calls,
+                        fontSize = 12.sp, color = palette.textSecondary
+                    )
+                }
+            }
+            if (index != people.lastIndex) HorizontalDivider(color = palette.cardBorder)
         }
     }
 }

@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Info
@@ -142,7 +144,9 @@ fun MoreScreen(
                     listOf(
                         MoreItem("Account", "Sign in to sync", Icons.Filled.AccountCircle),
                         MoreItem("Backup", "Cloud backup of your data", Icons.Filled.CloudUpload),
-                        MoreItem("Local Backup", "Save a backup file on this phone", Icons.Filled.SdStorage)
+                        MoreItem("Local Backup", "Save a backup file on this phone", Icons.Filled.SdStorage),
+                        MoreItem("Copy contacts", "Phone, SIM, Google & .vcf files", Icons.Filled.ContentCopy),
+                        MoreItem("Trash", "Restore deleted contacts & calls", Icons.Filled.Delete)
                     )
                 )
             )

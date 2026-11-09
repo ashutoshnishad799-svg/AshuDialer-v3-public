@@ -45,6 +45,14 @@ object CallNotificationHelper {
     var callStyleMode: String = "auto"
 
     /**
+     * Settings > Calls > "Status bar call chip" (v2.3). Off = the call is shown with the app's own themed notification card
+     * instead of Android's call style - and the call style is exactly what makes the system draw the chip in the status
+     * bar, so with this off there is no chip. Set by PixelInCallService.
+     */
+    @Volatile
+    var callChipEnabled: Boolean = true
+
+    /**
      * Which card the custom call notification wears (Personalize > Calls > Notification look):
      *  classic  - flat card that follows the app's light / dark theme (default)
      *  dark     - flat graphite card, always
@@ -431,16 +439,27 @@ object CallNotificationHelper {
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
 
-            if (connected && !onHold && ongoingCallStartMillis > 0L) {
-                builder.setWhen(ongoingCallStartMillis).setUsesChronometer(true).setShowWhen(true)
+            // THE FIX for "the status-bar chip counts seconds as soon as I place the call" (v2.3). The chip does NOT read the
+            // chronometer flag: it counts from the notification's own `when` time, and `when` defaults to "the moment the
+            // notification was built" - so the chip started ticking the second the call was placed, even though the timer
+            // inside the notification was already off. While the call is not connected `when` is now 0 ("no start time"), which
+            // makes the chip show just the call icon; once connected it is the real connect time, so the chip counts the real
+            // call length. On hold the clock keeps running from the same start (only the in-shade timer text is hidden).
+            if (connected && ongoingCallStartMillis > 0L) {
+                builder.setWhen(ongoingCallStartMillis)
+                if (!onHold) {
+                    builder.setUsesChronometer(true).setShowWhen(true)
+                } else {
+                    builder.setUsesChronometer(false).setShowWhen(false)
+                }
             } else {
-                builder.setUsesChronometer(false).setShowWhen(false)
+                builder.setWhen(0L).setUsesChronometer(false).setShowWhen(false)
             }
 
             // Xiaomi's own software (MIUI / HyperOS) only; Xiaomi hardware running AOSP gets the system call style.
             val isXiaomiFamily = OemPermissionHelper.isLikelyMiui()
 
-            val useSystemCallStyle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && when (callStyleMode) {
+            val useSystemCallStyle = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && callChipEnabled && when (callStyleMode) {
                 "system" -> true
                 "glass" -> false
                 else -> !isXiaomiFamily
@@ -467,6 +486,16 @@ object CallNotificationHelper {
                     androidx.core.graphics.drawable.IconCompat.createWithResource(context, R.drawable.ic_notif_mute),
                     "Mute", CallActionReceiver.toggleMuteIntent(context)
                 ).build()
+                if (!connected) {
+                    // Android 16+ can write a short word inside the status-bar chip. Until the call connects that word is
+                    // "Calling" (the chip has no timer yet); older Android versions simply ignore these two extras.
+                    builder.addExtras(
+                        android.os.Bundle().apply {
+                            putBoolean("android.requestPromotedOngoing", true)
+                            putString("android.shortCriticalText", "Calling")
+                        }
+                    )
+                }
                 builder
                     .setStyle(NotificationCompat.CallStyle.forOngoingCall(caller, CallActionReceiver.endIntent(context)))
                     .addAction(speakerAction)

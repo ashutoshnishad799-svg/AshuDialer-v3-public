@@ -73,6 +73,17 @@ import java.util.*
 import com.ashudialer.app.ui.components.glassCircle
 import com.ashudialer.app.ui.components.highlightMatch
 import com.ashudialer.app.ui.components.liquidGlass
+import com.ashudialer.app.ui.components.SearchNoResults
+import com.ashudialer.app.ui.components.SearchOverlay
+import com.ashudialer.app.ui.components.SearchPill
+import com.ashudialer.app.ui.components.SearchResultRow
+import com.ashudialer.app.ui.components.SearchSectionTitle
+import com.ashudialer.app.ui.components.rememberSearchHistory
+import com.ashudialer.app.ui.components.rememberVoiceSearch
+import com.ashudialer.app.ui.components.searchBestNumber
+import com.ashudialer.app.ui.components.searchDirectionLabel
+import com.ashudialer.app.ui.components.searchMatchRank
+import com.ashudialer.app.ui.components.searchTimeLabel
 
 private val recentFilters = listOf("All", "Missed", "Incoming", "Outgoing", "Today", "Contacts", "Identified", "Spam")
 
@@ -131,6 +142,15 @@ fun RecentsScreen(
     val palette = LocalDialerPalette.current
     var filter by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
+    // v2.3: tapping the search bar opens the full search screen (SearchOverlay). It keeps its own text, so the
+    // list behind it is not re-filtered on every key. The mic on the bar opens voice search and then the screen.
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchSeed by remember { mutableStateOf("") }
+    val searchHistory = rememberSearchHistory("recents")
+    val startVoiceSearch = rememberVoiceSearch("Say a name or number") { spoken ->
+        searchSeed = spoken
+        searchOpen = true
+    }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var actionTarget by remember { mutableStateOf<RecentCall?>(null) }
     var confirmClearAll by remember { mutableStateOf(false) }
@@ -200,7 +220,8 @@ fun RecentsScreen(
     }
     val grouped = remember(displayed) { displayed.groupBy { dateBucket(it.timestampMillis) } }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -254,73 +275,33 @@ fun RecentsScreen(
 
         Spacer(Modifier.height(6.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                // Was a flat .background(palette.searchBackground) - every other
-                // surface on this screen (FAQ-style cards, the theme picker chip,
-                // selection-mode icon buttons below) already goes through
-                // liquidGlass; this row was the one plain-background holdout,
-                // which is exactly why it read as visually flat next to
-                // everything around it. tintAlpha bumped slightly above
-                // liquidGlass's 0.55 default (to 0.62) since this bar has to stay
-                // legible with live typed text sitting on top of it, not just
-                // hold static content like a card.
-                .liquidGlass(palette, RoundedCornerShape(18.dp), tintAlpha = 0.62f)
-                .padding(start = 16.dp, end = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Filled.Search, contentDescription = null, tint = palette.textSecondary, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(10.dp))
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                if (searchQuery.isEmpty()) {
-                    // Matches the vertical padding on BasicTextField below so
-                    // the placeholder and the real text field occupy exactly
-                    // the same height and sit on the same baseline. Without
-                    // this, the placeholder (a plain Text with no vertical
-                    // padding of its own) was visibly shorter than the text
-                    // field, and Box's default TopStart alignment pinned it
-                    // to the top of that height difference - reading as the
-                    // whole search bar being slightly off-center vertically
-                    // whenever the field was empty (i.e. almost always).
-                    Text(
-                        "Search Recents",
-                        color = palette.textSecondary,
-                        fontSize = 15.sp,
-                        modifier = Modifier.padding(vertical = 12.dp)
-                    )
-                }
-                BasicTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    singleLine = true,
-                    textStyle = TextStyle(color = palette.textPrimary, fontSize = 15.sp),
-                    cursorBrush = SolidColor(palette.accent),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                )
-            }
-            if (searchQuery.isNotEmpty()) {
-                IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = "Clear search", tint = palette.textSecondary, modifier = Modifier.size(16.dp))
+        // v2.3: the bar is now a button - typing happens on the search screen it opens (see SearchOverlay).
+        SearchPill(
+            hint = "Search Recents",
+            onOpen = {
+                searchSeed = ""
+                searchOpen = true
+            },
+            onMic = startVoiceSearch,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            trailing = {
+                Box {
+                    IconButton(onClick = { showOverflowMenu = true }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More options", tint = palette.textSecondary, modifier = Modifier.size(18.dp))
+                    }
+                    DropdownMenu(expanded = showOverflowMenu, onDismissRequest = { showOverflowMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Clear call log") },
+                            leadingIcon = { Icon(Icons.Filled.DeleteSweep, contentDescription = null) },
+                            onClick = {
+                                showOverflowMenu = false
+                                confirmClearAll = true
+                            }
+                        )
+                    }
                 }
             }
-            Box {
-                IconButton(onClick = { showOverflowMenu = true }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "More options", tint = palette.textSecondary, modifier = Modifier.size(18.dp))
-                }
-                DropdownMenu(expanded = showOverflowMenu, onDismissRequest = { showOverflowMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Clear call log") },
-                        leadingIcon = { Icon(Icons.Filled.DeleteSweep, contentDescription = null) },
-                        onClick = {
-                            showOverflowMenu = false
-                            confirmClearAll = true
-                        }
-                    )
-                }
-            }
-        }
+        )
 
         Spacer(Modifier.height(12.dp))
 
@@ -477,6 +458,39 @@ fun RecentsScreen(
                 item { Spacer(Modifier.height(16.dp)) }
             }
         }
+    }
+
+    // The search screen sits on top of the whole page and grows down from the search bar.
+    SearchOverlay(
+        visible = searchOpen,
+        hint = "Search Recents",
+        seedQuery = searchSeed,
+        history = searchHistory,
+        onClose = { searchOpen = false },
+        modifier = Modifier.fillMaxSize()
+    ) { q, picked ->
+        RecentsSearchResults(
+            query = q,
+            recents = recents,
+            contacts = searchContacts,
+            onOpenContact = { contact ->
+                picked(contact.displayName)
+                onOpenSearchContact(contact)
+            },
+            onOpenUnsaved = { call ->
+                picked(q)
+                onViewOrAddContact(call)
+            },
+            onCallContact = { contact ->
+                picked(contact.displayName)
+                onCallSearchContact(contact)
+            },
+            onCallRecent = { call ->
+                picked(q)
+                onCall(call)
+            }
+        )
+    }
     }
 
     val sheetTarget = actionTarget
@@ -1115,6 +1129,156 @@ private fun SwipeableCallRow(
                 content()
             }
         }
+        }
+    }
+}
+
+
+// ------------------------------------------------------------------------------------------------------------------
+// v2.3 search results (shown by the search screen)
+// ------------------------------------------------------------------------------------------------------------------
+
+/**
+ * One row of the search results: a saved person (with or without calls) or an unsaved number that has calls.
+ *
+ * THE FIX for "Ritik Rai has a recent call, Ritik Rai 2 does not, and typing Ritik Rai shows only the first": saved
+ * contacts used to be listed ONLY when no recent call matched at all, so a single matching call hid every other
+ * matching contact. Now every matching contact is a row; a contact with no call shows "No recent call found".
+ */
+private data class RecentsSearchHit(
+    val key: String,
+    val name: String,
+    val number: String,
+    val photoUri: String?,
+    val contact: Contact?,
+    val lastCall: RecentCall?,
+    val callCount: Int,
+    val rank: Int
+)
+
+/** Two spellings of the same number ("+91 98765 43210", "09876543210") get the same key: their last 10 digits. */
+private fun recentsMatchKey(raw: String): String {
+    val digits = raw.filter { it.isDigit() }
+    return when {
+        digits.isEmpty() -> raw.trim().lowercase()
+        digits.length > 10 -> digits.takeLast(10)
+        else -> digits
+    }
+}
+
+private fun buildRecentsSearchHits(query: String, recents: List<RecentCall>, contacts: List<Contact>): List<RecentsSearchHit> {
+    val q = query.trim()
+    if (q.isEmpty()) return emptyList()
+
+    val callsByKey = recents.groupBy { recentsMatchKey(it.phoneNumber) }
+    val hits = ArrayList<RecentsSearchHit>()
+    val coveredKeys = HashSet<String>()
+
+    // 1) saved people - one row per person, even when they have several numbers
+    for ((contactId, entries) in contacts.groupBy { it.contactId }) {
+        val first = entries.first()
+        val numbers = entries.map { it.phoneNumber }
+        var best = searchMatchRank(first.displayName, "", q)
+        for (n in numbers) {
+            val r = searchMatchRank(first.displayName, n, q)
+            if (r >= 0 && (best < 0 || r < best)) best = r
+        }
+        if (best < 0) continue
+
+        val keys = numbers.map { recentsMatchKey(it) }.toSet()
+        coveredKeys.addAll(keys)
+        val theirCalls = keys.flatMap { callsByKey[it].orEmpty() }
+        val last = theirCalls.maxByOrNull { it.timestampMillis }
+        val shownNumber = searchBestNumber(numbers, q)
+        hits.add(
+            RecentsSearchHit(
+                key = "c_$contactId",
+                name = first.displayName,
+                number = shownNumber,
+                photoUri = entries.firstOrNull { it.photoUri != null }?.photoUri,
+                contact = entries.firstOrNull { it.phoneNumber == shownNumber } ?: first,
+                lastCall = last,
+                callCount = theirCalls.sumOf { it.callCount },
+                rank = best
+            )
+        )
+    }
+
+    // 2) calls from numbers that are not saved (or carry a caller-ID name) and match what was typed
+    for ((key, calls) in callsByKey) {
+        if (key in coveredKeys) continue
+        val newest = calls.maxByOrNull { it.timestampMillis } ?: continue
+        val rank = searchMatchRank(newest.displayName, newest.phoneNumber, q)
+        if (rank < 0) continue
+        hits.add(
+            RecentsSearchHit(
+                key = "r_$key",
+                name = newest.displayName,
+                number = newest.phoneNumber,
+                photoUri = newest.photoUri,
+                contact = null,
+                lastCall = newest,
+                callCount = calls.sumOf { it.callCount },
+                rank = rank
+            )
+        )
+    }
+
+    return hits
+        .sortedWith(
+            compareBy<RecentsSearchHit> { it.rank }
+                .thenByDescending { it.lastCall?.timestampMillis ?: 0L }
+                .thenBy { it.name.lowercase() }
+        )
+        .take(80)
+}
+
+@Composable
+private fun RecentsSearchResults(
+    query: String,
+    recents: List<RecentCall>,
+    contacts: List<Contact>,
+    onOpenContact: (Contact) -> Unit,
+    onOpenUnsaved: (RecentCall) -> Unit,
+    onCallContact: (Contact) -> Unit,
+    onCallRecent: (RecentCall) -> Unit
+) {
+    val hits = remember(query, recents, contacts) { buildRecentsSearchHits(query, recents, contacts) }
+    if (hits.isEmpty()) {
+        SearchNoResults("No contact or recent call found for \"$query\"")
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
+    ) {
+        item(key = "results-title") {
+            SearchSectionTitle(if (hits.size == 1) "1 result" else "${hits.size} results")
+        }
+        items(hits, key = { it.key }) { hit ->
+            val last = hit.lastCall
+            val subtitle = if (last != null) {
+                val times = if (hit.callCount > 1) " (${hit.callCount})" else ""
+                "${searchDirectionLabel(last.direction)}$times \u00b7 ${searchTimeLabel(last.timestampMillis)}"
+            } else {
+                "No recent call found"
+            }
+            SearchResultRow(
+                name = hit.name,
+                number = hit.number,
+                photoUri = hit.photoUri,
+                query = query,
+                subtitle = subtitle,
+                subtitleIsWarning = last != null && last.direction == CallDirection.MISSED,
+                onClick = {
+                    val c = hit.contact
+                    if (c != null) onOpenContact(c) else if (last != null) onOpenUnsaved(last)
+                },
+                onCall = {
+                    val c = hit.contact
+                    if (c != null) onCallContact(c) else if (last != null) onCallRecent(last)
+                }
+            )
         }
     }
 }
