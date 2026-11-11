@@ -64,6 +64,7 @@ fun RecordingSettingsScreen(
     var autoIn by remember { mutableStateOf(prefs.autoRecordIncoming) }
     var autoOut by remember { mutableStateOf(prefs.autoRecordOutgoing) }
     var onAnswer by remember { mutableStateOf(prefs.recordOnAnswerOnly) }
+    var showAutoStatus by remember { mutableStateOf(prefs.showAutoRecordStatus) }
     var ignoreAnon by remember { mutableStateOf(prefs.ignoreAnonymousIncoming) }
     var ignoreCcIn by remember { mutableStateOf(prefs.ignoreCrossCountryIncoming) }
     var ignoreCcOut by remember { mutableStateOf(prefs.ignoreCrossCountryOutgoing) }
@@ -163,6 +164,11 @@ fun RecordingSettingsScreen(
                     Toggle("Incoming calls", null, autoIn, palette) { autoIn = it; prefs.autoRecordIncoming = it }
                     Toggle("Outgoing calls", null, autoOut, palette) { autoOut = it; prefs.autoRecordOutgoing = it }
                     Toggle("Only after the call is answered", "Skips ringing and unanswered calls", onAnswer, palette) { onAnswer = it; prefs.recordOnAnswerOnly = it }
+                    Toggle(
+                        "Show recording status in the call",
+                        "Shows the recording bar on the call screen for auto-recorded calls too. Off keeps auto-recording out of sight",
+                        showAutoStatus, palette
+                    ) { showAutoStatus = it; prefs.showAutoRecordStatus = it }
                     Spacer(Modifier.height(6.dp))
                     OutlinedButton(onClick = onOpenAppCallsSetup, Modifier.fillMaxWidth()) { Text("WhatsApp & Telegram call recording", fontSize = 13.sp) }
                 }

@@ -782,6 +782,10 @@ private fun buildScallopPath(width: Float, height: Float, petals: Int): Path {
 
 @Composable
 private fun RecordingWaveformBar(seconds: Int, mode: RecordingMode?, looksSilent: Boolean = false, micIsSystemMuted: Boolean = false) {
+    // v2.3: THE FIX for "the recording graph is black in dark mode" - the bar, the time and the little notes were all
+    // drawn in fixed black, which vanishes on a dark call screen. They now use the theme's own text colour (light on dark,
+    // dark on light), so the graph is visible in every theme.
+    val ink = LocalDialerPalette.current.textPrimary
     val bars = remember { List(28) { Random.nextFloat() * 0.7f + 0.15f } }
     val transition = rememberInfiniteTransition(label = "waveform")
     val phase by transition.animateFloat(
@@ -796,13 +800,13 @@ private fun RecordingWaveformBar(seconds: Int, mode: RecordingMode?, looksSilent
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 8.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color.Black.copy(alpha = 0.12f))
+                .background(ink.copy(alpha = 0.14f))
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(modifier = Modifier.size(10.dp).background(Color(0xFFE53E3E), CircleShape))
             Spacer(Modifier.width(10.dp))
-            Text(text = formatDuration(seconds), color = Color.Black.copy(alpha = 0.7f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(text = formatDuration(seconds), color = ink.copy(alpha = 0.85f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.width(12.dp))
             Row(
                 modifier = Modifier.weight(1f).height(20.dp),
@@ -815,7 +819,7 @@ private fun RecordingWaveformBar(seconds: Int, mode: RecordingMode?, looksSilent
                         modifier = Modifier
                             .width(2.5.dp)
                             .fillMaxHeight(animatedHeight)
-                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                            .background(ink.copy(alpha = 0.55f), RoundedCornerShape(2.dp))
                     )
                 }
             }
@@ -871,7 +875,7 @@ private fun RecordingWaveformBar(seconds: Int, mode: RecordingMode?, looksSilent
         } else if (mode == RecordingMode.MICROPHONE) {
             Text(
                 text = "Recording via microphone — call audio access is restricted by Android/OEM",
-                color = Color.Black.copy(alpha = 0.55f),
+                color = ink.copy(alpha = 0.7f),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
@@ -879,7 +883,7 @@ private fun RecordingWaveformBar(seconds: Int, mode: RecordingMode?, looksSilent
         } else if (mode == RecordingMode.VOICE_COMMUNICATION) {
             Text(
                 text = "Recording via communication audio",
-                color = Color.Black.copy(alpha = 0.55f),
+                color = ink.copy(alpha = 0.7f),
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
@@ -1368,6 +1372,14 @@ private fun ConferencePanel(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // v2.3: "Manage call" - the host's list of everyone on the call, each with their own End call button.
+        Text(
+            "Manage call \u00b7 ${participants.size} on this call",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = palette.textSecondary,
+            modifier = Modifier.padding(start = 4.dp)
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1391,6 +1403,14 @@ private fun ConferencePanel(
                 onHold = { onHoldParticipant(index) },
                 onPrivate = { onSplit(index) },
                 onEnd = { onRemove(index) }
+            )
+        }
+        if (participants.isNotEmpty() && participants.none { it.canRemove }) {
+            Text(
+                "This network does not let the phone end one person on their own. \"End all\" finishes the call for everyone.",
+                fontSize = 11.5.sp,
+                color = palette.textSecondary,
+                modifier = Modifier.padding(horizontal = 4.dp)
             )
         }
         Spacer(Modifier.height(4.dp))

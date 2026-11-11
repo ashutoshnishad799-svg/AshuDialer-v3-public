@@ -876,8 +876,12 @@ class MainActivity : ComponentActivity() {
             // onCall callback - means locking a number protects it everywhere
             // a call to it could be started from, with no risk of a new call
             // site being added later and forgetting the check.
-            fun placeCall(number: String) {
+            fun placeCall(number: String, afterMs: Long = 0L) {
                 app.applicationScope.launch {
+                    // v2.3: [afterMs] lets a popup that is closing finish its animation before the call starts. Starting the
+                    // call at the very same moment made the phone busy bringing up the call screen while the popup was still
+                    // folding away, so the dialer looked frozen for a moment.
+                    if (afterMs > 0L) kotlinx.coroutines.delay(afterMs)
                     val locked = try {
                         viewModel.isNumberLocked(number)
                     } catch (_: Exception) {
@@ -1587,7 +1591,7 @@ class MainActivity : ComponentActivity() {
                                     dialerContent = { entrance, onInfo ->
                                         DialerScreen(
                                             contacts = contacts,
-                                            onCall = { number -> buttonHaptic(); floatingDialerOpen = false; placeCall(number) },
+                                            onCall = { number -> buttonHaptic(); floatingDialerOpen = false; placeCall(number, afterMs = 280L) },
                                             onMessage = { number -> buttonHaptic(); floatingDialerOpen = false; sendMessage(number) },
                                             onAddContact = { number ->
                                                 buttonHaptic()
@@ -1610,7 +1614,7 @@ class MainActivity : ComponentActivity() {
                                         com.ashudialer.app.ui.components.FloatingRecentsList(
                                             palette = palette,
                                             recents = recents,
-                                            onCall = { call -> buttonHaptic(); floatingRecentsOpen = false; placeCall(call.phoneNumber) },
+                                            onCall = { call -> buttonHaptic(); floatingRecentsOpen = false; placeCall(call.phoneNumber, afterMs = 280L) },
                                             onOpenAll = { floatingRecentsOpen = false; selectedTab = DialerTab.RECENT }
                                         )
                                     }

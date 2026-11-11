@@ -51,8 +51,47 @@ object ServerExtractor {
                 return path
             }
         }
-        if (lastError.isBlank()) lastError = "no folder to keep the helper file in"
+        // Last resort for ROMs that block the app from its OWN folder on shared storage (storage read/write permission
+        // problems on some custom ROMs): on a ROOTED phone, make the folders and open their permissions, then try again.
+        // Without root this is skipped quickly and the original reason is reported.
+        val firstReason = lastError
+        if (fixStorageWithRoot(context)) {
+            for (path in candidates) {
+                if (ensureServerFile(context, path)) {
+                    lastError = ""
+                    return path
+                }
+            }
+        }
+        lastError = firstReason.ifBlank { "no folder to keep the helper file in" }
         return null
+    }
+
+    /**
+     * v2.3: runs the same two commands that fix the problem by hand on affected ROMs:
+     *   mkdir -p /storage/emulated/0/Android/data/<this app>/cache
+     *   chmod -R 777 /storage/emulated/0/Android/data/<this app>
+     * It needs root (`su`). A phone without root simply does not have `su`, the call fails at once and nothing changes.
+     */
+    @WorkerThread
+    fun fixStorageWithRoot(context: Context): Boolean {
+        val base = "/storage/emulated/0/Android/data/${context.packageName}"
+        val command = "mkdir -p $base/cache $base/files && chmod -R 777 $base"
+        return try {
+            val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()
+            if (!process.waitFor(6, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                AppCallsLogger.w(TAG, "Root storage fix timed out")
+                false
+            } else {
+                val ok = process.exitValue() == 0
+                AppCallsLogger.d(TAG, "Root storage fix finished, success=$ok")
+                ok
+            }
+        } catch (e: Exception) {
+            AppCallsLogger.d(TAG, "Root storage fix not available: ${e.message}")
+            false
+        }
     }
 
     @WorkerThread

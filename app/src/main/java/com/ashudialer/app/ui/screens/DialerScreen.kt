@@ -825,6 +825,10 @@ private fun MatchedContactsList(
             .then(if (wide) Modifier.bleedHorizontally(bleed) else Modifier)
             .fillMaxWidth()
             .heightIn(max = 340.dp)
+            // v2.3: THE FIX for "the suggestions at the top look cut off" - the list was as tall as the room it was given, which
+            // is rarely a whole number of rows, so the next row showed as a thin hard-cut sliver along the bottom edge. The
+            // height now snaps to whole rows (a row is about 59dp), so only complete rows are shown.
+            .snapToWholeRows(row = 59.dp, extra = 14.dp)
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 20.dp, bottomEnd = 20.dp))
             .background(panel)
             .verticalEdgeFade(top = 16.dp),
@@ -1127,6 +1131,29 @@ private fun Modifier.verticalEdgeFade(top: androidx.compose.ui.unit.Dp): Modifie
             )
         }
     }
+
+/**
+ * Caps the height at a whole number of rows (plus [extra] for the list's own padding) so a half-visible row is never cut
+ * off at the edge. A little [tolerance] lets a row that is only just clipped still count as fitting.
+ */
+private fun Modifier.snapToWholeRows(
+    row: androidx.compose.ui.unit.Dp,
+    extra: androidx.compose.ui.unit.Dp,
+    tolerance: androidx.compose.ui.unit.Dp = 6.dp
+): Modifier = this.layout { measurable, constraints ->
+    val rowPx = row.roundToPx().coerceAtLeast(1)
+    val extraPx = extra.roundToPx()
+    val tolerancePx = tolerance.roundToPx()
+    val max = constraints.maxHeight
+    val capped = if (max == androidx.compose.ui.unit.Constraints.Infinity) {
+        max
+    } else {
+        val fit = ((max - extraPx + tolerancePx) / rowPx).coerceAtLeast(1)
+        (fit * rowPx + extraPx).coerceAtMost(max)
+    }
+    val placeable = measurable.measure(constraints.copy(maxHeight = capped))
+    layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+}
 
 /** Lets a child be wider than its parent by [bleed] on each side (used for the edge-to-edge suggestion box). */
 private fun Modifier.bleedHorizontally(bleed: androidx.compose.ui.unit.Dp): Modifier = this.layout { measurable, constraints ->

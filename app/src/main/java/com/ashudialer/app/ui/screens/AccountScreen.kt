@@ -116,6 +116,67 @@ fun AccountScreen(
                 )
             }
         }
+        SigningFingerprintCard(Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+    }
+}
+
+/**
+ * v2.3: shows the fingerprints of the key this app is signed with, with a Copy button, so Google sign-in "error 10" can be
+ * fixed by registering exactly these in the Firebase Console. Folded away until asked for.
+ */
+@Composable
+private fun SigningFingerprintCard(modifier: Modifier = Modifier) {
+    val palette = LocalDialerPalette.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var open by remember { mutableStateOf(false) }
+    val prints = remember { com.ashudialer.app.data.SigningFingerprint.read(context) }
+
+    Column(modifier = modifier.fillMaxWidth().glassCard(palette, 18.dp)) {
+        Text(
+            if (open) "Hide signing fingerprint" else "Google sign-in error 10? Show signing fingerprint",
+            color = palette.accent,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.fillMaxWidth().clickable { open = !open }.padding(16.dp)
+        )
+        if (open) {
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                Text(
+                    "Error 10 means the key this app is signed with is not registered in Firebase. Add the fingerprints below in " +
+                        "Firebase Console > Project settings > Your apps > com.ashudialer.app > Add fingerprint. Then download the " +
+                        "new google-services.json, put it in the GOOGLE_SERVICES_JSON secret and build again.",
+                    fontSize = 12.sp,
+                    color = palette.textSecondary
+                )
+                Spacer(Modifier.height(10.dp))
+                listOf("SHA-1" to prints?.sha1, "SHA-256" to prints?.sha256).forEach { (label, value) ->
+                    Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
+                    Text(
+                        value ?: "Could not read the signing key",
+                        fontSize = 11.5.sp,
+                        color = palette.textSecondary,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+                    )
+                    if (value != null) {
+                        Text(
+                            "Copy $label",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.accent,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(value))
+                                    android.widget.Toast.makeText(context, "$label copied", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(vertical = 6.dp, horizontal = 2.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+            }
+        }
     }
 }
 

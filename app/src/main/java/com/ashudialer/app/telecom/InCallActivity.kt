@@ -603,6 +603,22 @@ class InCallActivity : ComponentActivity() {
                 }
             }
 
+            // v2.3 (optional, Settings > Recording > "Show recording status in the call"): a recording that AUTO-record starts
+            // a moment after the call connects used to stay invisible here, because this screen only looked at the recorder
+            // when it opened. With the option on, the screen notices the recording and shows the bar like a manual one.
+            LaunchedEffect(callState) {
+                if (!com.ashudialer.app.BuildConfig.CALL_RECORDING_ENABLED) return@LaunchedEffect
+                if (!com.ashudialer.app.appcalls.recording.RecordingPrefs(applicationContext).showAutoRecordStatus) return@LaunchedEffect
+                while (true) {
+                    if (!isRecording && app.callRecorder.isRecording) {
+                        recordingSeconds = app.callRecorder.elapsedSeconds()
+                        recordingMode = app.callRecorder.currentMode()
+                        isRecording = true
+                    }
+                    kotlinx.coroutines.delay(700)
+                }
+            }
+
             LaunchedEffect(isRecording, callState) {
                 if (!isRecording) return@LaunchedEffect
                 var quietPollsInARow = 0
@@ -870,6 +886,34 @@ class InCallActivity : ComponentActivity() {
                             conferenceParticipantUi(m, saved, confOwner)
                         }
                     }
+                    // v2.3: when the network does not say who is inside the conference (no members to list), show the numbers
+                    // that were merged, so the host still sees everyone on the call. Such a person cannot be ended alone
+                    // (the screen says so and offers End all).
+                    val mergedNumbers = remember(callTick, current, callState, isConference, confMembers.size) {
+                        if (isConference && confMembers.isEmpty()) PixelInCallService.mergedSnapshot else emptyList()
+                    }
+                    val mergedParticipants by produceState(
+                        mergedNumbers.map { n ->
+                            com.ashudialer.app.ui.screens.ConferenceParticipantUi(
+                                name = n, number = n, canRemove = false, canSplit = false,
+                                isOnHold = callState == Call.STATE_HOLDING
+                            )
+                        },
+                        mergedNumbers,
+                        callState
+                    ) {
+                        value = mergedNumbers.map { n ->
+                            val saved = app.contactsRepository.lookupNameForNumber(n)?.displayName
+                            com.ashudialer.app.ui.screens.ConferenceParticipantUi(
+                                name = if (saved.isNullOrBlank()) n else saved,
+                                number = n,
+                                canRemove = false,
+                                canSplit = false,
+                                isSaved = !saved.isNullOrBlank(),
+                                isOnHold = callState == Call.STATE_HOLDING
+                            )
+                        }
+                    }
                     val secondary = PixelInCallService.secondaryCall
                     val secondaryNumber = secondary?.details?.handle?.schemeSpecificPart.orEmpty()
                     var secondarySaved by remember(secondaryNumber) { mutableStateOf<String?>(null) }
@@ -1018,7 +1062,7 @@ class InCallActivity : ComponentActivity() {
                                 callerName = if (isConference) "Conference call" else displayName,
                                 callerNumber = if (isConference) "${confMembers.size.coerceAtLeast(2)} people" else number,
                                 isSavedContact = isSavedContact && !isConference,
-                                conferenceParticipants = if (isConference) confParticipants else emptyList(),
+                                conferenceParticipants = if (isConference) (if (confMembers.isNotEmpty()) confParticipants else mergedParticipants) else emptyList(),
                                 onRemoveParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.removeFromConference(it) } },
                                 onSplitParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.splitFromConference(it) } },
                                 onHoldParticipant = { i -> confMembers.getOrNull(i)?.let { PixelInCallService.instance?.toggleHoldParticipant(it) } },

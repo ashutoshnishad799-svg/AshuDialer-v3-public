@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.3.1 - 9 November 2026  (fixes after testing 2.3.0)
+
+- **In-app updater works again.** It asked Firebase's latest.json first and stopped there whenever that answered - and that file was
+  stale ("1.7.0"), so every phone said "up to date" forever while newer releases sat on GitHub. It now asks Firebase AND GitHub and
+  takes the newer. The GitHub repository is no longer hard-coded: CI passes it in (BuildConfig.UPDATE_REPO). public/latest.json was
+  refreshed.
+- **Google sign-in error 10**: it means the key this APK is signed with is not registered in Firebase. Account now has
+  "Google sign-in error 10? Show signing fingerprint" with the SHA-1 / SHA-256 of the running app and Copy buttons, and the error
+  message names the SHA-1. The GitHub workflow no longer prints the fingerprints in its (public) log: it writes them to
+  signing-fingerprints.txt and attaches it to a DRAFT release, which only repository collaborators can see.
+- **Dialer: suggestions no longer look cut off.** The list was as tall as the room it was given, so the next row showed as a thin
+  hard-cut sliver; its height now snaps to whole rows.
+- **Dialer: placing a call from the floating dialer no longer freezes it.** The call now starts a moment after the popup has
+  folded away instead of at the same instant as the call screen came up.
+- **Onboarding first screen redesigned**: plain left-aligned type, one real-looking recent-call row, no glow or pulsing rings (the
+  background glow now fades in only after the first page).
+- **Conference calls: "Manage call" list.** The host sees everyone on the call with each person's own hold / private / End call.
+  When the network does not report who is inside a conference, the numbers that were merged are listed instead, with a note that
+  only "End all" is possible then.
+- **Recording graph is visible in dark mode** (it was fixed black).
+- **Optional: Settings > Recording > "Show recording status in the call"** shows the recording bar for auto-recorded calls too
+  (off by default, as before).
+- **Recording helper file**: if the app cannot write into its own folder on shared storage (a ROM storage-permission problem), a
+  rooted phone now runs the fix automatically (`mkdir -p` the app folders and `chmod -R 777`) and tries again; without root it is
+  skipped.
+- Version 2.3.1 (versionCode 21).
+
 ## 2.3.0 - 9 November 2026  (new search, Trash, copy contacts, call chip)
 
 Modified edition of 2.2.0. Files changed since 2.2.0 are listed at the bottom (GPL section 5(a)).

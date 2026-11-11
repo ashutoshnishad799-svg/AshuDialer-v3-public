@@ -35,13 +35,17 @@ class UpdateChecker(private val context: Context) {
     suspend fun check(): UpdateCheckResult = withContext(Dispatchers.IO) {
         val current = BuildConfig.VERSION_NAME
 
-        // Primary source: Firebase Hosting latest.json.
-        fetchFirebaseManifest(current)?.let { return@withContext it }
-
-        // Fallback: the public GitHub release created by CI. This prevents the
-        // update screen from showing a scary HTTP 404 when Hosting has not yet
-        // been deployed, while still finding a real newer APK when CI released it.
-        fetchLatestGitHubRelease(current)?.let { return@withContext it }
+        // v2.3: BOTH sources are asked and the NEWER one wins. It used to stop at Firebase's latest.json whenever that
+        // answered - and that file is only updated by hand, so a stale copy ("1.7.0") made every phone say "up to date"
+        // forever while newer releases sat on GitHub. Now a stale manifest can no longer hide a newer release.
+        val firebase = fetchFirebaseManifest(current)
+        val github = fetchLatestGitHubRelease(current)
+        val candidates = listOfNotNull(firebase, github)
+        val newer = candidates.filter { it.updateAvailable }
+            .maxWithOrNull(Comparator { x, y -> compareVersions(x.latestVersion ?: "", y.latestVersion ?: "") })
+        if (newer != null) return@withContext newer
+        // Nothing newer: report whichever source answered (so the screen can show the latest version it knows).
+        (github ?: firebase)?.let { return@withContext it }
 
         // Never turn a temporary update-server outage into a red error screen.
         // The installed build is still usable, so present a clean current-state.
@@ -274,8 +278,9 @@ class UpdateChecker(private val context: Context) {
         // The repository the APKs are actually published to (see .github/workflows/build.yml).
         // It used to point at ".../Ashudialer" (no "-v2"), a repo that has no releases, so the
         // GitHub fallback always returned 404 and "no update" was reported forever.
-        private const val GITHUB_REPO = "ashutoshnishad799-svg/AshuDialer-v2"
-        private const val GITHUB_RELEASE_API = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
+        // The repository is taken from the build (BuildConfig.UPDATE_REPO = the repo CI built from), with the old name as backup.
+        private val GITHUB_REPO: String = BuildConfig.UPDATE_REPO.ifBlank { "ashutoshnishad799-svg/AshuDialer-v2" }
+        private val GITHUB_RELEASE_API: String = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
         private val ALLOWED_DOWNLOAD_HOSTS = setOf(
             "ashu-phone-07x.web.app",
             "github.com",

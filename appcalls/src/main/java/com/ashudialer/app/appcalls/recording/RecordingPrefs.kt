@@ -154,6 +154,14 @@ class RecordingPrefs(private val context: Context) {
         get() = prefs.getBoolean("vibrate_on_start_stop", true)
         set(v) = prefs.edit { putBoolean("vibrate_on_start_stop", v) }
 
+    /**
+     * v2.3: show the recording bar (red dot, time, wave) on the call screen for AUTO-started recordings too. Off by default:
+     * an auto-recording stays out of sight, as it always has. A recording the person starts with the button is always shown.
+     */
+    var showAutoRecordStatus: Boolean
+        get() = prefs.getBoolean("show_auto_record_status", false)
+        set(v) = prefs.edit { putBoolean("show_auto_record_status", v) }
+
     // Off by default: the "Recording started / saved" pop-up appeared on every call.
     var showToasts: Boolean
         get() = prefs.getBoolean("show_toasts", false)

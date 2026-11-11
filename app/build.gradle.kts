@@ -74,8 +74,8 @@ android {
         applicationId = "com.ashudialer.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 20
-        versionName = "2.3.0"
+        versionCode = 21
+        versionName = "2.3.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -124,6 +124,9 @@ android {
         // SHA-256 of the OFFICIAL release signing certificate, passed in by CI (-PASHU_CERT_SHA256=...). The app compares
         // it with the certificate it is actually signed with (see IntegrityGuard). Empty on local / debug builds, where
         // the check is skipped, so building on your own machine still works.
+        // v2.3: the GitHub repository the in-app updater looks at. CI passes -PASHU_UPDATE_REPO=$GITHUB_REPOSITORY, so the
+        // updater always asks the repository the APK was really built and released from (it was hard-coded before).
+        buildConfigField("String", "UPDATE_REPO", "\"${(project.findProperty("ASHU_UPDATE_REPO") as String?)?.trim().takeUnless { it.isNullOrEmpty() } ?: "ashutoshnishad799-svg/AshuDialer-v2"}\"")
         buildConfigField("String", "EXPECTED_CERT_SHA256", "\"${(project.findProperty("ASHU_CERT_SHA256") as String?)?.trim().orEmpty()}\"")
 
         ndk {

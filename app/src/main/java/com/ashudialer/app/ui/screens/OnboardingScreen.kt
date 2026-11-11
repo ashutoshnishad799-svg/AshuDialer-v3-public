@@ -45,6 +45,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Call
@@ -83,6 +84,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ashudialer.app.R
+import com.ashudialer.app.ui.components.Avatar
+import com.ashudialer.app.ui.components.staggerIn
 import com.ashudialer.app.ui.components.bounceClick
 import com.ashudialer.app.ui.components.liquidGlass
 import com.ashudialer.app.ui.theme.AUTO_THEME_ID
@@ -172,8 +175,10 @@ fun OnboardingScreen(
             val frac = (progress - idx).coerceIn(0f, 1f)
             val c = androidx.compose.ui.graphics.lerp(pageColors[idx], pageColors[next], frac)
             val dark = palette.isDark
-            glow(w * (0.82f - 0.12f * (progress / (pageCount - 1))), h * 0.16f, w * 0.95f, c, if (dark) 0.30f else 0.22f)
-            glow(w * (0.10f + 0.16f * (progress / (pageCount - 1))), h * 0.78f, w * 0.85f, c, if (dark) 0.16f else 0.13f)
+            // v2.3: no glow behind the first page (it looked like a generated template); it fades in as the person swipes on.
+            val glowAmount = progress.coerceIn(0f, 1f)
+            glow(w * (0.82f - 0.12f * (progress / (pageCount - 1))), h * 0.16f, w * 0.95f, c, (if (dark) 0.30f else 0.22f) * glowAmount)
+            glow(w * (0.10f + 0.16f * (progress / (pageCount - 1))), h * 0.78f, w * 0.85f, c, (if (dark) 0.16f else 0.13f) * glowAmount)
         }
 
         Column(Modifier.fillMaxSize()) {
@@ -201,6 +206,18 @@ fun OnboardingScreen(
             HorizontalPager(state = pagerState, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
                 val offset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
                 val dist = abs(offset).coerceIn(0f, 1f)
+                if (page == 0) {
+                    WelcomePage(
+                        palette = palette,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 28.dp)
+                            .graphicsLayer {
+                                translationX = -offset * size.width * 0.28f
+                                alpha = 1f - dist
+                            }
+                    )
+                } else
                 Column(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -303,6 +320,81 @@ fun OnboardingScreen(
                 }
             }
         }
+    }
+}
+
+// ------------------------------------------------------------------------------------------------
+//  Page 1 - Welcome (v2.3 redesign): plain, left-aligned type and one real-looking recent-call row.
+//  No glow, no pulsing rings: the old centred logo-with-halo page looked like a template. This one is mostly typography,
+//  and the only picture is a piece of the actual app.
+// ------------------------------------------------------------------------------------------------
+
+@Composable
+private fun WelcomePage(palette: DialerPalette, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.Start) {
+        Spacer(Modifier.weight(0.55f))
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.staggerIn(0)) {
+            Image(
+                painter = painterResource(R.drawable.ic_onboarding_logo),
+                contentDescription = "Ashu Phone",
+                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(13.dp))
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Ashu Phone", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Text("Dialer and call recorder", fontSize = 12.5.sp, color = palette.textSecondary)
+            }
+        }
+
+        Spacer(Modifier.height(34.dp))
+        Text(
+            text = buildAnnotatedString {
+                withStyle(SpanStyle(color = palette.textPrimary)) { append("Calls,\n") }
+                withStyle(SpanStyle(color = palette.accent)) { append("without the clutter.") }
+            },
+            fontSize = 40.sp,
+            lineHeight = 45.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.staggerIn(1)
+        )
+
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Search that finds people as you type, call recording you control, and nothing leaves your phone unless you choose it.",
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            color = palette.textSecondary,
+            modifier = Modifier.staggerIn(2)
+        )
+
+        Spacer(Modifier.height(30.dp))
+        val cardShape = RoundedCornerShape(20.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .staggerIn(3)
+                .clip(cardShape)
+                .background(palette.cardBackground)
+                .border(1.dp, palette.cardBorder, cardShape)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Avatar(name = "Ritik Rai", photoUri = null, size = 46.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Ritik Rai", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
+                Text("Mobile \u00b7 Today, 7:09 PM", fontSize = 13.sp, color = palette.textSecondary)
+            }
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(palette.accentSoft),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Phone, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
+            }
+        }
+
+        Spacer(Modifier.weight(0.45f))
     }
 }
 

@@ -191,6 +191,18 @@ class AuthRepository(private val context: Context) {
             val user = authResult.user?.toSignedInUser()
                 ?: return SignInResult.Failure("Sign-in succeeded but no user was returned.")
             SignInResult.Success(user)
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            // 10 = DEVELOPER_ERROR: the key this APK is signed with is not registered in Firebase.
+            val fingerprint = SigningFingerprint.read(context)?.sha1
+            SignInResult.Failure(
+                if (e.statusCode == 10) {
+                    "Google sign-in error 10: this build's signing key isn't registered in Firebase. " +
+                        "Open Account > \"Google sign-in error 10?\" to copy the SHA-1" +
+                        (fingerprint?.let { " ($it)" } ?: "") + " and add it in the Firebase Console."
+                } else {
+                    "Google sign-in failed (code ${e.statusCode}). ${e.message.orEmpty()}".trim()
+                }
+            )
         } catch (e: Exception) {
             SignInResult.Failure(e.message ?: "Sign-in failed.")
         }

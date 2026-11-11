@@ -1,6 +1,6 @@
 {
-  "versionCode": 13,
-  "versionName": "1.7.0",
-  "downloadUrl": "https://github.com/ashutoshnishad799-svg/AshuDialer-v2/releases/download/v1.7.0/AshuPhone-1.7.0.apk",
-  "releaseNotes": "Theme now follows your system's light/dark setting by default, Send feedback button in Help & Support (attaches your app version, device info and last crash automatically), option to turn off the pulsing glow on the Swipe incoming-call style, incoming call style preview no longer gets cut off at the top or bottom."
+  "versionCode": 21,
+  "versionName": "2.3.1",
+  "downloadUrl": "https://github.com/ashutoshnishad799-svg/AshuDialer-v2/releases/download/v2.3.1/AshuPhone-2.3.1.apk",
+  "releaseNotes": "2.3.1: onboarding redesign, dialer suggestion and call-start fixes, Manage call list for conferences, updater and recording-graph fixes. 2.3.0: New search screen with recent searches and voice search, Trash for deleted contacts and calls, copy contacts between phone / SIM / Google / .vcf files, edit button and WhatsApp-friendly sharing, call chip timer fix, vibrate on connect / end, animated Call Insights day pages."
 }

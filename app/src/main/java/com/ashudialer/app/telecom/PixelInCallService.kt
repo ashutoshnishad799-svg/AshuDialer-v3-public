@@ -182,6 +182,14 @@ class PixelInCallService : InCallService() {
             }
         }
 
+        /**
+         * v2.3: the numbers that were on the two calls at the moment the person tapped Merge. Some networks do not tell the
+         * phone who is inside a conference afterwards (the conference call has no members to list); the call screen then
+         * falls back to this list so the host still sees every number on the call.
+         */
+        @Volatile
+        var mergedSnapshot: List<String> = emptyList()
+
         /** The people inside a conference call (empty for a normal call). */
         fun conferenceMembers(call: Call?): List<Call> = try {
             call?.children?.filter { it.state != Call.STATE_DISCONNECTED }.orEmpty()
@@ -512,6 +520,7 @@ class PixelInCallService : InCallService() {
             _availableAudioRoutes.value = listOf(AudioRoute.EARPIECE, AudioRoute.SPEAKER)
             _isMuted.value = false
             _nativeVideoUpgradeActive.value = false
+            mergedSnapshot = emptyList()
             CallNotificationHelper.clear(applicationContext)
         } else {
             refreshNotificationFromCalls()
@@ -1023,6 +1032,25 @@ class PixelInCallService : InCallService() {
     /** Joins the two calls. Taps while a merge is already running are ignored; the screen shows "Merging...". */
     fun mergeCalls() {
         if (_mergePending.value) return
+        // v2.3: remember who is being merged (see mergedSnapshot).
+        try {
+            val numbers = LinkedHashSet<String>()
+            fun collect(c: Call?) {
+                if (c == null) return
+                val kids = conferenceMembers(c)
+                if (kids.isNotEmpty()) {
+                    kids.forEach { collect(it) }
+                } else {
+                    val n = c.details?.handle?.schemeSpecificPart.orEmpty()
+                    if (n.isNotBlank()) numbers.add(n)
+                }
+            }
+            collect(currentCall)
+            collect(secondaryCall)
+            if (numbers.isNotEmpty()) mergedSnapshot = numbers.toList()
+        } catch (e: Throwable) {
+            Log.w(TAG, "Could not remember who is being merged", e)
+        }
         _mergePending.value = true
         mergeIssued = false
         mergeWaitedMs = 0L

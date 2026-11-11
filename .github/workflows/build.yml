@@ -86,35 +86,32 @@ jobs:
           printf '%s' "$ASHU_RELEASE_KEYSTORE_BASE64" | base64 -d > app/ashuphone-release.keystore
           test -s app/ashuphone-release.keystore
 
-      # Prints this keystore's SHA-1/SHA-256 fingerprints on every single
-      # build, so a Google Sign-In failure (video calling / cloud backup
-      # both use it) can be diagnosed straight from this log instead of
-      # needing a separate local `keytool` run. Google Sign-In additionally
-      # checks the signing certificate that actually built the APK against
-      # fingerprints registered in Firebase Console, so a perfectly valid
-      # google-services.json still fails sign-in at runtime if THIS
-      # fingerprint isn't the one registered there. This step never fails
-      # the build either way (fingerprint mismatch is a Firebase Console
-      # configuration issue, not a build error) - it only makes the
-      # information visible.
-      - name: Print release keystore fingerprints (for Firebase Console)
+      # Writes this keystore's SHA-1 / SHA-256 fingerprints into a FILE (signing-fingerprints.txt) on every build, so a
+      # Google Sign-In "error 10" can be fixed by pasting them into the Firebase Console. The fingerprints are NOT
+      # printed to the log: this repository is public, and so are its workflow logs and artifacts. The file goes into a
+      # DRAFT release further down, which only people with write access to the repository can see. (The same values
+      # are also shown inside the app: Account > "Google sign-in error 10?".) This step never fails the build.
+      - name: Write release keystore fingerprints to a private file
         env:
           ASHU_RELEASE_STORE_PASSWORD: ${{ secrets.ASHU_RELEASE_STORE_PASSWORD }}
           ASHU_RELEASE_KEY_ALIAS: ${{ secrets.ASHU_RELEASE_KEY_ALIAS }}
         run: |
-          echo "================================================================"
-          echo "  If Google Sign-In (video calling / cloud backup) doesn't work"
-          echo "  on the built APK, confirm the SHA-1 below is registered in:"
-          echo "  Firebase Console -> Project Settings -> Your apps ->"
-          echo "  the com.ashudialer.app Android app -> Add fingerprint"
-          echo "================================================================"
-          keytool -list -v \
-            -keystore app/ashuphone-release.keystore \
-            -alias "$ASHU_RELEASE_KEY_ALIAS" \
-            -storepass "$ASHU_RELEASE_STORE_PASSWORD" \
-            2>/dev/null | grep -E "SHA1:|SHA256:" || \
-            echo "⚠️  Could not read the keystore to print fingerprints - check ASHU_RELEASE_KEY_ALIAS/ASHU_RELEASE_STORE_PASSWORD secrets are correct."
-          echo "================================================================"
+          {
+            echo "Ashu Phone - signing fingerprints (private)"
+            echo "Package: com.ashudialer.app"
+            echo "Build:   run #${GITHUB_RUN_NUMBER} of ${GITHUB_REPOSITORY}"
+            echo ""
+            keytool -list -v \
+              -keystore app/ashuphone-release.keystore \
+              -alias "$ASHU_RELEASE_KEY_ALIAS" \
+              -storepass "$ASHU_RELEASE_STORE_PASSWORD" \
+              2>/dev/null | grep -E "SHA1:|SHA256:" | sed 's/^ *//' || \
+              echo "Could not read the keystore - check the ASHU_RELEASE_KEY_ALIAS / ASHU_RELEASE_STORE_PASSWORD secrets."
+            echo ""
+            echo "Add them in: Firebase Console -> Project settings -> Your apps -> com.ashudialer.app -> Add fingerprint."
+            echo "Then download the new google-services.json and paste it into the GOOGLE_SERVICES_JSON secret."
+          } > signing-fingerprints.txt
+          echo "Fingerprint file written (not printed - this log is public)."
 
       # Reads the SHA-256 of the release certificate and exports it, so the build can embed it. The app compares this
       # with the certificate it is really signed with at start-up; a copy that was modified and re-signed with anyone
@@ -202,3 +199,19 @@ jobs:
           gh release upload "$TAG" "ci-artifacts/AshuPhone-${VERSION}.apk" --clobber
           # Mark it as the latest release even when it was created earlier (idempotent).
           gh release edit "$TAG" --latest || true
+
+      # A DRAFT release is invisible to the public - only people with write access to the repository (you) see it, under
+      # Releases. It carries signing-fingerprints.txt. Older private drafts are removed first so they do not pile up. This
+      # is not the "latest" release, so the in-app updater never sees it. Never fails the build.
+      - name: Save fingerprints in a private draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == true and (.name | startswith("Private fingerprints"))) | .id' 2>/dev/null \
+            | while read -r id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}" || true; done
+          gh release create "private-fingerprints-${GITHUB_RUN_NUMBER}" signing-fingerprints.txt \
+            --draft \
+            --title "Private fingerprints (run ${GITHUB_RUN_NUMBER})" \
+            --notes "Signing fingerprints for Firebase. Draft = visible only to repository collaborators." \
+            || echo "::warning::Could not create the private draft release (the build itself is fine)."
