@@ -100,9 +100,20 @@ class ShellService : IShellService.Stub {
 
             // Security check: verify the jar's SHA-256 before exec, in the shell process
             // itself (reduces, though doesn't fully eliminate, a TOCTOU window).
-            val serverJarFile = File(serverPath)
-            if (!serverJarFile.exists() || !com.ashudialer.app.appcalls.scrcpy.ServerExtractor.verifyServerHash(serverJarFile)) {
-                AppCallsLogger.w(TAG, "Server jar absent or SHA-256 mismatch at $serverPath - aborting")
+            // v2.3.2: [serverPath] may be "apk:<the app's APK>" - the app could not put the helper on shared storage (some
+            // ROMs refuse to create its own folder there), so it is unpacked HERE, in the shell process, into /data/local/tmp.
+            val extractor = com.ashudialer.app.appcalls.scrcpy.ServerExtractor
+            val effectiveServerPath: String = if (serverPath.startsWith(extractor.APK_REFERENCE_PREFIX)) {
+                extractor.extractFromApkAsShell(serverPath.removePrefix(extractor.APK_REFERENCE_PREFIX)) ?: run {
+                    AppCallsLogger.w(TAG, "Could not unpack the helper from the APK - aborting")
+                    return null
+                }
+            } else {
+                serverPath
+            }
+            val serverJarFile = File(effectiveServerPath)
+            if (!serverJarFile.exists() || !extractor.verifyServerHash(serverJarFile)) {
+                AppCallsLogger.w(TAG, "Server jar absent or SHA-256 mismatch at $effectiveServerPath - aborting")
                 return null
             }
 
@@ -128,7 +139,7 @@ class ShellService : IShellService.Stub {
             launchCommand.addAll(serverArgs)
 
             val scrcpyBuilder = ProcessBuilder(launchCommand).apply {
-                environment()["CLASSPATH"] = serverPath
+                environment()["CLASSPATH"] = effectiveServerPath
                 redirectErrorStream(true)
             }
             scrcpyProcess = scrcpyBuilder.start()

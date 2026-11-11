@@ -1,6 +1,6 @@
 {
-  "versionCode": 21,
-  "versionName": "2.3.1",
-  "downloadUrl": "https://github.com/ashutoshnishad799-svg/AshuDialer-v2/releases/download/v2.3.1/AshuPhone-2.3.1.apk",
-  "releaseNotes": "2.3.1: onboarding redesign, dialer suggestion and call-start fixes, Manage call list for conferences, updater and recording-graph fixes. 2.3.0: New search screen with recent searches and voice search, Trash for deleted contacts and calls, copy contacts between phone / SIM / Google / .vcf files, edit button and WhatsApp-friendly sharing, call chip timer fix, vibrate on connect / end, animated Call Insights day pages."
+  "versionCode": 22,
+  "versionName": "2.3.2",
+  "downloadUrl": "https://github.com/ashutoshnishad799-svg/AshuDialer-v2/releases/download/v2.3.2/AshuPhone-2.3.2.apk",
+  "releaseNotes": "2.3.2: call recording no longer depends on the app's own folder on shared storage, minimal first onboarding screen with the app icon. 2.3.1: onboarding redesign, dialer suggestion and call-start fixes, Manage call list for conferences, updater and recording-graph fixes. 2.3.0: New search screen with recent searches and voice search, Trash for deleted contacts and calls, copy contacts between phone / SIM / Google / .vcf files, edit button and WhatsApp-friendly sharing, call chip timer fix, vibrate on connect / end, animated Call Insights day pages."
 }

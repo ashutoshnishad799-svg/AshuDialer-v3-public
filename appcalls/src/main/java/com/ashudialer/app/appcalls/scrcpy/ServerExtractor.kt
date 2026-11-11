@@ -51,19 +51,10 @@ object ServerExtractor {
                 return path
             }
         }
-        // Last resort for ROMs that block the app from its OWN folder on shared storage (storage read/write permission
-        // problems on some custom ROMs): on a ROOTED phone, make the folders and open their permissions, then try again.
-        // Without root this is skipped quickly and the original reason is reported.
-        val firstReason = lastError
-        if (fixStorageWithRoot(context)) {
-            for (path in candidates) {
-                if (ensureServerFile(context, path)) {
-                    lastError = ""
-                    return path
-                }
-            }
-        }
-        lastError = firstReason.ifBlank { "no folder to keep the helper file in" }
+        if (lastError.isBlank()) lastError = "no folder to keep the helper file in"
+        // On a rooted phone also run the storage fix in the background (once per app start), so the NEXT call can use the
+        // normal folder. It never blocks this call: the caller falls back to unpacking the helper from the APK instead.
+        tryRootStorageFixInBackground(context)
         return null
     }
 
@@ -109,6 +100,61 @@ object ServerExtractor {
             AppCallsLogger.w(TAG, "Could not delete the stale server file at $serverPath")
         }
         return extractFromAssets(context, file)
+    }
+
+    /** Marks "the shell service should unpack the helper itself from this APK" in the path handed to it. */
+    const val APK_REFERENCE_PREFIX = "apk:"
+
+    /**
+     * v2.3.2: what to hand to the shell service when the app could not put the helper file on shared storage - the path of
+     * the app's own APK, which every user (including the shell) can read. Null when it is not known.
+     */
+    fun apkReference(context: Context): String? {
+        val source = context.applicationInfo?.sourceDir
+        return if (source.isNullOrBlank()) null else APK_REFERENCE_PREFIX + source
+    }
+
+    @Volatile
+    private var rootFixTried = false
+
+    /** Runs [fixStorageWithRoot] once per app start on a background thread. Never blocks the caller. */
+    fun tryRootStorageFixInBackground(context: Context) {
+        if (rootFixTried) return
+        rootFixTried = true
+        val app = context.applicationContext
+        Thread({ fixStorageWithRoot(app) }, "ashu-root-storage-fix").start()
+    }
+
+    /**
+     * v2.3.2: runs INSIDE the shell service (user shell or root). Unpacks the helper jar from the app's own APK into
+     * /data/local/tmp - the folder scrcpy itself uses - so recording does not depend on the app's folder on shared storage,
+     * which some ROMs refuse to create ("cannot create the folder .../Android/data/<app>/cache"). The checksum is verified.
+     * Returns the path to use, or null.
+     */
+    fun extractFromApkAsShell(apkPath: String): String? {
+        val target = File("/data/local/tmp/ashu-scrcpy-${ScrcpyConfig.SCRCPY_VERSION}-server.jar")
+        return try {
+            if (target.exists() && verifyServerHash(target)) return target.absolutePath
+            target.delete()
+            java.util.zip.ZipFile(apkPath).use { zip ->
+                val entry = zip.getEntry("assets/" + BuildConfig.SCRCPY_SERVER_ASSET_NAME)
+                if (entry == null) {
+                    AppCallsLogger.w(TAG, "Helper asset not found inside $apkPath")
+                    return null
+                }
+                zip.getInputStream(entry).use { input -> writeFile(target, input) }
+            }
+            target.setReadable(true, false)
+            if (verifyServerHash(target)) {
+                target.absolutePath
+            } else {
+                AppCallsLogger.w(TAG, "Helper unpacked from the APK but its checksum did not match")
+                null
+            }
+        } catch (e: Exception) {
+            AppCallsLogger.w(TAG, "Unpacking the helper from the APK failed: ${e.message}")
+            null
+        }
     }
 
     private fun extractFromAssets(context: Context, destFile: File): Boolean {

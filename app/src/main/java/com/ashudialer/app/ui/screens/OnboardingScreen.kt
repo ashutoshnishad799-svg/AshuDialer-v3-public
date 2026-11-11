@@ -84,6 +84,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ashudialer.app.R
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import com.ashudialer.app.ui.components.Avatar
 import com.ashudialer.app.ui.components.staggerIn
 import com.ashudialer.app.ui.components.bounceClick
@@ -324,78 +326,61 @@ fun OnboardingScreen(
 }
 
 // ------------------------------------------------------------------------------------------------
-//  Page 1 - Welcome (v2.3 redesign): plain, left-aligned type and one real-looking recent-call row.
-//  No glow, no pulsing rings: the old centred logo-with-halo page looked like a template. This one is mostly typography,
-//  and the only picture is a piece of the actual app.
+//  Page 1 - Welcome (v2.3.2 redesign): the app's own icon and two lines of text. That is all.
+//  No glow, no rings, no cards, one soft fade-in. The icon is read from the installed app, so it is always the icon on the
+//  person's home screen (whichever launcher-icon style they picked), never a copy that can go out of date.
 // ------------------------------------------------------------------------------------------------
 
 @Composable
 private fun WelcomePage(palette: DialerPalette, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.Start) {
-        Spacer(Modifier.weight(0.55f))
+    val style = LocalAshuStyle.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val iconPx = with(density) { 104.dp.roundToPx() }
+    val icon = remember(iconPx) { loadLauncherIconBitmap(context, iconPx) }
 
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.staggerIn(0)) {
+    // One gentle fade-in; nothing else on this page moves.
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val enter by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(style.ms(450)),
+        label = "welcome-enter"
+    )
+
+    Column(
+        modifier = modifier.graphicsLayer { alpha = enter },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+    ) {
+        if (icon != null) {
+            Image(bitmap = icon, contentDescription = "Ashu Phone", modifier = Modifier.size(104.dp))
+        } else {
             Image(
                 painter = painterResource(R.drawable.ic_onboarding_logo),
                 contentDescription = "Ashu Phone",
-                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(13.dp))
+                modifier = Modifier.size(104.dp).clip(RoundedCornerShape(26.dp))
             )
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text("Ashu Phone", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                Text("Dialer and call recorder", fontSize = 12.5.sp, color = palette.textSecondary)
-            }
         }
-
-        Spacer(Modifier.height(34.dp))
-        Text(
-            text = buildAnnotatedString {
-                withStyle(SpanStyle(color = palette.textPrimary)) { append("Calls,\n") }
-                withStyle(SpanStyle(color = palette.accent)) { append("without the clutter.") }
-            },
-            fontSize = 40.sp,
-            lineHeight = 45.sp,
-            fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.staggerIn(1)
-        )
-
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Search that finds people as you type, call recording you control, and nothing leaves your phone unless you choose it.",
-            fontSize = 16.sp,
-            lineHeight = 24.sp,
-            color = palette.textSecondary,
-            modifier = Modifier.staggerIn(2)
-        )
-
-        Spacer(Modifier.height(30.dp))
-        val cardShape = RoundedCornerShape(20.dp)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .staggerIn(3)
-                .clip(cardShape)
-                .background(palette.cardBackground)
-                .border(1.dp, palette.cardBorder, cardShape)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Avatar(name = "Ritik Rai", photoUri = null, size = 46.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Ritik Rai", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = palette.textPrimary)
-                Text("Mobile \u00b7 Today, 7:09 PM", fontSize = 13.sp, color = palette.textSecondary)
-            }
-            Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(palette.accentSoft),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Phone, contentDescription = null, tint = palette.accent, modifier = Modifier.size(18.dp))
-            }
-        }
-
-        Spacer(Modifier.weight(0.45f))
+        Spacer(Modifier.height(32.dp))
+        Text("Ashu Phone", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = palette.textPrimary)
+        Spacer(Modifier.height(10.dp))
+        Text("A quiet, private dialer.", fontSize = 16.sp, color = palette.textSecondary)
     }
+}
+
+/** The launcher icon exactly as the home screen shows it (the enabled launcher entry), drawn at [sizePx]. */
+private fun loadLauncherIconBitmap(context: android.content.Context, sizePx: Int): androidx.compose.ui.graphics.ImageBitmap? = try {
+    val pm = context.packageManager
+    val launch = android.content.Intent(android.content.Intent.ACTION_MAIN)
+        .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+        .setPackage(context.packageName)
+    @Suppress("DEPRECATION")
+    val entries = pm.queryIntentActivities(launch, 0)
+    val drawable = entries.firstOrNull()?.loadIcon(pm) ?: pm.getApplicationIcon(context.packageName)
+    drawable.toBitmap(sizePx, sizePx).asImageBitmap()
+} catch (e: Exception) {
+    null
 }
 
 // ------------------------------------------------------------------------------------------------

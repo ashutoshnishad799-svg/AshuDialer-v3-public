@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.3.2 - 11 November 2026
+
+- **Call recording: "cannot create the folder .../Android/data/<app>/cache" is fixed at the root.** On some ROMs the app is not
+  allowed to create its own folder on shared storage, and the recording helper (scrcpy server) used to be placed there so the
+  shell process could read it. Now, when the app cannot place it, the shell service (the Shizuku side) unpacks the helper straight
+  from the app's own APK (which the shell can always read) into /data/local/tmp - the folder scrcpy itself uses - verifies its
+  SHA-256 and runs it from there. No root, no manual `mkdir` / `chmod`. The root command from 2.3.1 is kept, but now runs once in
+  the background (it can no longer delay the start of a recording) and only helps the next call use the normal folder.
+- **First onboarding screen, minimal**: the app's own launcher icon (read from the installed app, so it is always the one on the
+  home screen), "Ashu Phone" and one line. One soft fade-in, no other motion, no glow.
+- Version 2.3.2 (versionCode 22).
+
 ## 2.3.1 - 9 November 2026  (fixes after testing 2.3.0)
 
 - **In-app updater works again.** It asked Firebase's latest.json first and stopped there whenever that answered - and that file was

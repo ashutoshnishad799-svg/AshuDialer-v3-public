@@ -96,6 +96,12 @@ class AppCallRecordingEngine(private val context: Context) {
 
         // v2.3: tries the normal folder, then a second one, replaces a stale file, and says WHY when it still cannot.
         val serverPath = ServerExtractor.prepareServerFile(context)
+            // v2.3.2: THE FIX for "cannot create the folder .../Android/data/<app>/cache" on ROMs that block an app from its
+            // own folder on shared storage. The shell service (which Shizuku runs) unpacks the helper from the APK straight
+            // into /data/local/tmp, so recording no longer needs that folder at all.
+            ?: ServerExtractor.apkReference(context)?.also {
+                AppCallsLogger.w(TAG, "App-side helper file failed (${ServerExtractor.lastError}); the shell service will unpack it from the APK")
+            }
             ?: throw AppCallPipelineException(
                 "Couldn't prepare the recording helper file" +
                     (ServerExtractor.lastError.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: "") + ". Try again."
