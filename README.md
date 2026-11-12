@@ -27,20 +27,6 @@ Recordings are saved in `Music/Ashu Dialer/`, in one folder per source: `Phone`,
 If a recording turns out to contain only silence, the app tries the next audio source by itself
 (for app calls) and otherwise tells you, so you do not find an empty file after the call.
 
-## Build
-
-Pushing to `main` or `master` (or running the workflow by hand) builds and signs the APK and attaches
-it to a release. It needs these repository secrets: `GOOGLE_SERVICES_JSON`,
-`ASHU_RELEASE_KEYSTORE_BASE64`, `ASHU_RELEASE_STORE_PASSWORD`, `ASHU_RELEASE_KEY_ALIAS`,
-`ASHU_RELEASE_KEY_PASSWORD`.
-
-## Usage statistics
-
-The app sends only anonymous, aggregate events through Firebase Analytics: app opened, and which
-features were switched on. Never phone numbers, contacts, names or recordings. Active users and new
-installs are visible in the Firebase console. Download counts are per release asset on the Releases
-page.
-
 ## Security
 
 Release builds carry the fingerprint of the official signing certificate (CI reads it from the keystore). A copy that was
@@ -97,8 +83,6 @@ Ashu Phone stands on open-source work. Thank you to:
   the call-recording engine is adapted from it. Ashu Phone's recorder is a modified fork derived from it.
 - **[Ever Dialer](https://github.com/hari161008/Ever-Dialer)** by hari161008 (GPL-3.0): recorder module
   groundwork, and ideas for recorder settings, haptic strength, bottom-bar customisation and glass looks.
-- **[CallVault](https://github.com/madkongo/CallVault)** by madkongo (GPL-3.0 with additional terms):
-  ideas only - Drive backup through the system file picker, marking moments, stars, tags and notes.
 - **[JemRec](https://github.com/jemcik/JemRec)** by Yevhen Yemchynskyi (Apache-2.0): ideas only - marking
   moments, discarding very short recordings, recorder health checks.
 - **[scrcpy](https://github.com/Genymobile/scrcpy)** by Genymobile (Apache-2.0): the bundled, unmodified
